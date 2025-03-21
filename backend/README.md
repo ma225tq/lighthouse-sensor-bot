@@ -16,3 +16,21 @@ mistralai/ministral-8b
 
 mistralai/mistral-tiny <- funkar dåligt med mer avancerad sql
 
+
+
+
+
+Oxana förslår:
+
+meta-llama/llama-3.3-70b-instruct:free
+
+google/gemini-2.0-pro-exp-02-05:free
+
+
+
+Melker förslår:
+
+Grok                    https://openrouter.ai/models?q=grok
+
+watt-tool-70B (FC)      
+

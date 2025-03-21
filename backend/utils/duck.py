@@ -8,9 +8,9 @@ def get_default_instructions(semantic_model) -> List[str]:
 
         instructions += [
             "Determine if you can answer the question directly or if you need to run a query to accomplish the task.",
-            "If you need to run a query, **FIRST THINK** about how you will accomplish the task and then write the query.",
+            "If you need to run a query, **FIRST THINK** about how you will accomplish the task and then write the query.",  # 1. Kolla tabeller först
         ]
-
+    # Om semantic_model inte är None, lägg till instruktionen att använda semantic_model för att hitta vilka tabeller och kolumner som behövs för att uppnå uppgiften
         if semantic_model is not None:
             instructions += [
                 "Using the `semantic_model` below, find which tables and columns you need to accomplish the task.",
@@ -18,9 +18,9 @@ def get_default_instructions(semantic_model) -> List[str]:
 
         
         instructions += [
-            "If you need to run a query, run `show_tables` to check the tables you need exist.",
-            "If the tables do not exist, RUN `create_table_from_path` to create the table using the path from the `semantic_model` or the `knowledge_base`.",
-            "Once you have the tables and columns, create one single syntactically correct DuckDB query.",
+            "If you need to run a query, run `show_tables` to check the tables you need exist.",  # 'show_tables' Visar alla tabeller i DuckDB
+            "If the tables do not exist, RUN `create_table_from_path` to create the table using the path from the `semantic_model` or the `knowledge_base`.",  #2. Skapa tabell om den inte finns, 'create_table_from_path' Skapar en tabell från en fil (t.ex. CSV)
+            "Once you have the tables and columns, create one single syntactically correct DuckDB query.", #3. Skapa en enda syntaktiskt korrekt DuckDB-fråga
         ]
         if semantic_model is not None:
             instructions += [
@@ -29,7 +29,7 @@ def get_default_instructions(semantic_model) -> List[str]:
             ]
         
         instructions += [
-                "Use 'describe_table' to inspect the tables and only join on columns that have the same name and data type.",
+                "Use 'describe_table' to inspect the tables and only join on columns that have the same name and data type.", # 'describe_table' Visar strukturen på en tabell (t.ex. kolumnnamn och datatyper)
         ]
 
         instructions += [

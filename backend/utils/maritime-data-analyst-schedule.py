@@ -11,7 +11,7 @@ data_analyst = DuckDbAgent(
             "tables": [
                  {
                     "name": "ferry-trips-data",
-                    "description": (
+                    "description": (  # ... beskrivning av tabellen och dess kolumner
                         "A CSV file containing records of trips made by 5 ferries owned by Färjerederiet. "
                         "Contains data from 5 ferries owned and operated by Färjerederiet:\n\n"
                         "- Fragancia\n"

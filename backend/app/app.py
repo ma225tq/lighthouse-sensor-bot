@@ -17,7 +17,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from agno.agent import Agent, Message, RunResponse
-from agno.tools.duckdb import DuckDbTools
+from agno.tools.duckdb import DuckDbTools   # DuckDB som lokal databas
 from agno.utils.log import logger  
 
 from app.services.agent import initialize_agent

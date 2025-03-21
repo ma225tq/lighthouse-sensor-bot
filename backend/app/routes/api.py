@@ -56,14 +56,14 @@ def query_endpoint():
     
         semantic_instructions = utils.duck.get_default_instructions(semantic_model_data)
         
-        # Create a new instance of CustomDuckDbTools with the source_file
+        # Create a new instance of CustomDuckDbTools with the source_file (Här skapas DuckDB-verktyget som håller datan)
         duck_tools = CustomDuckDbTools(
             data_dir=str(data_dir),
             semantic_model=current_app.config['SEMANTIC_MODEL'],
             source_file=source_file
         )
         
-        # Update the existing agent's tools and instructions
+        # Update the existing agent's tools and instructions (Detta verktyg används sedan för alla frågor)
         data_analyst.tools = [duck_tools]
         data_analyst.instructions = semantic_instructions
         

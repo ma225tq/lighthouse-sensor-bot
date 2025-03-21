@@ -3,14 +3,12 @@ import json
 from ragas import evaluate, EvaluationDataset
 from ragas.metrics import LLMContextRecall, Faithfulness, SemanticSimilarity
 # from ragas.dataset_schema import SingleTurnSample
-from ragas.metrics._string import NonLLMStringSimilarity
 from ragas.metrics import RougeScore
-from ragas.metrics import StringPresence
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 # from langchain_openai import ChatOpenAI
-from langchain_deepseek import ChatDeepSeek
-from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface.llms import HuggingFaceEndpoint
+from langchain_huggingface import HuggingFaceEmbeddings
 import os
 from dotenv import load_dotenv
 from pathlib import Path
@@ -24,13 +22,16 @@ load_dotenv()
 API_URL = os.getenv('API_URL')
 RAGAS_APP_TOKEN = os.getenv('RAGAS_APP_TOKEN')
 
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
-
-# Initialize LLM and Embeddings wrappers
-
-# evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o"))
-evaluator_llm = LangchainLLMWrapper(ChatDeepSeek(model="deepseek-chat", temperature=0))
-evaluator_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings())
+# Initialize LLM and Embeddings wrappers using the same models as in ragas_tests.py
+evaluator_llm = LangchainLLMWrapper(
+    HuggingFaceEndpoint(
+        repo_id="google/flan-t5-xl",  # Same model as in ragas_tests.py
+        huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
+    )
+)
+evaluator_embeddings = LangchainEmbeddingsWrapper(
+    HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")  # This is completely FREE - it runs through Hugging Face's free API.
+)
 
 def run_test_case(query, ground_truth=None):
     """Run a single test case through the API"""
@@ -126,15 +127,14 @@ def run_synthetic_evaluation():
         LLMContextRecall(llm=evaluator_llm),
         Faithfulness(llm=evaluator_llm),
         BleuScore(),
-        NonLLMStringSimilarity(),
-        RougeScore(),
-        StringPresence()
+        RougeScore()
     ]
     
     # Run evaluation
-    ragas_results = evaluate(eval_dataset, metrics, llm=evaluator_llm)
-    
-    ragas_results.upload()
+    ragas_results = evaluate(
+        eval_dataset,
+        metrics=metrics
+    )
     
     # Create output directory with timestamp
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

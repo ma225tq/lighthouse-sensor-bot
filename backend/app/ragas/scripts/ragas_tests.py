@@ -2,11 +2,13 @@ import pandas as pd
 import json
 import requests
 from ragas import evaluate, EvaluationDataset
-from ragas.metrics import AspectCritic, LLMContextRecall, Faithfulness, FactualCorrectness, SemanticSimilarity
+from ragas.metrics import LLMContextRecall, Faithfulness, SemanticSimilarity, BleuScore, RougeScore
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from langchain_openai import ChatOpenAI
 from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface.llms import HuggingFaceEndpoint
+from langchain_huggingface import HuggingFaceEmbeddings
 import os
 from dotenv import load_dotenv
 from pathlib import Path
@@ -18,9 +20,16 @@ load_dotenv()
 API_URL = os.getenv('API_URL')
 RAGAS_APP_TOKEN = os.getenv('RAGAS_APP_TOKEN')
 
-# Initialize LLM and Embeddings wrappers
-evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o"))
-evaluator_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings())
+# Initialize using Hugging Face models
+evaluator_llm = LangchainLLMWrapper(
+    HuggingFaceEndpoint(
+        repo_id="google/flan-t5-xl",  # Use a smaller model that's still effective
+        huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
+    )
+)
+evaluator_embeddings = LangchainEmbeddingsWrapper(
+    HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+)
 
 def run_test_case(query, ground_truth=None):
     api_url = f"{API_URL}/api/query"
@@ -38,7 +47,7 @@ def run_test_case(query, ground_truth=None):
         
         if agent_response is None:
             print(f"Error: No 'content' key found in the API response for query: {query}")
-            return None, None, True
+            return None, None, False
             
         # Format the complete context with reasoning and SQL
         contexts = []
@@ -48,6 +57,7 @@ def run_test_case(query, ground_truth=None):
         # Add the complete agent response as context
         contexts.append(f"Agent Reasoning and Response: {full_response}")
         
+        # This is the original return format: response, context, success
         return agent_response, contexts, True
         
     except requests.exceptions.RequestException as e:
@@ -96,19 +106,26 @@ ragas_data = pd.DataFrame({
 # Create EvaluationDataset
 eval_dataset = EvaluationDataset.from_pandas(ragas_data)
 
-# Define metrics including context recall
+# Use a mix of LLM-dependent and non-LLM metrics
 metrics = [
     LenientFactualCorrectness(),
     SemanticSimilarity(embeddings=evaluator_embeddings),
     LLMContextRecall(llm=evaluator_llm),
-    Faithfulness(llm=evaluator_llm)
+    Faithfulness(llm=evaluator_llm),
+    BleuScore(),
+    RougeScore()
 ]
 
 print(ragas_data[['user_input', 'response', 'reference']])
 
-ragas_results = evaluate(eval_dataset, metrics, llm=evaluator_llm)
+# Run evaluation
+ragas_results = evaluate(
+    eval_dataset,
+    metrics=metrics
+)
 
-ragas_results.upload()
+# Also comment out the upload line (line 112)
+# ragas_results.upload()
 
 # Add RAGAS metrics to results_df
 for metric_name, scores in ragas_results.to_pandas().items():
