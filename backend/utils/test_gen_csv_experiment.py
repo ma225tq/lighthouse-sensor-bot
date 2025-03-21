@@ -9,6 +9,8 @@ from ragas.testset import TestsetGenerator
 from langchain.docstore.document import Document
 import json
 
+
+# Generates synthetic test cases using GPT-4o, saves them to a CSV file testset_syntethic.csv
 # Load CSV data
 df = pd.read_csv("backend/data/ferry_trips_data.csv")
 

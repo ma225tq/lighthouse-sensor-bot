@@ -34,3 +34,6 @@ Grok                    https://openrouter.ai/models?q=grok
 
 watt-tool-70B (FC)      
 
+
+
+huggingface-model dong:

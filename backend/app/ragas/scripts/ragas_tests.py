@@ -21,12 +21,22 @@ API_URL = os.getenv('API_URL')
 RAGAS_APP_TOKEN = os.getenv('RAGAS_APP_TOKEN')
 
 # Initialize using Hugging Face models
-evaluator_llm = LangchainLLMWrapper(
-    HuggingFaceEndpoint(
-        repo_id="google/flan-t5-xl",  # Use a smaller model that's still effective
+evaluator_llm = None
+try:
+    print("Initializing evaluator with gpt2 model")
+    hf_llm = HuggingFaceEndpoint(
+        repo_id="gpt2",
         huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
     )
-)
+    # Test by actually generating text
+    test_text = hf_llm.invoke("Hello world")
+    print(f"Test output: {test_text[:20]}...")
+    evaluator_llm = LangchainLLMWrapper(hf_llm)
+except Exception as e:
+    print(f"Failed to initialize LLM: {e}")
+    evaluator_llm = None
+    print("WARNING: Continuing with non-LLM metrics only")
+
 evaluator_embeddings = LangchainEmbeddingsWrapper(
     HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 )
@@ -34,38 +44,41 @@ evaluator_embeddings = LangchainEmbeddingsWrapper(
 def run_test_case(query, ground_truth=None):
     api_url = f"{API_URL}/api/query"
     try:
+        # Always include the source_file parameter with the query
         response = requests.post(api_url, json={
             "question": query,
-            "source_file": "ferry_trips_data.csv"
+            "source_file": "ferry_trips_data.csv"  # Add this to prevent 400 Bad Request
         })
         response.raise_for_status()
         
         response_data = response.json()
-        agent_response = response_data.get('content')  # This is already the clean response
-        full_response = response_data.get('full_response')  # This contains the full context
-        sql_queries = response_data.get('sql_queries', [])
+        agent_response = response_data.get('content')
         
         if agent_response is None:
-            print(f"Error: No 'content' key found in the API response for query: {query}")
-            return None, None, False
+            # Return an empty string instead of None to prevent RAGAS errors
+            return "", [], False
             
+        # Extract queries and context if available
+        sql_queries = response_data.get('sql_queries', [])
+        full_response = response_data.get('full_response', '')
+        
         # Format the complete context with reasoning and SQL
         contexts = []
         for sql in sql_queries:
             contexts.append(f"SQL Query: {sql}")
         
         # Add the complete agent response as context
-        contexts.append(f"Agent Reasoning and Response: {full_response}")
+        if full_response:
+            contexts.append(f"Agent Reasoning and Response: {full_response}")
         
-        # This is the original return format: response, context, success
         return agent_response, contexts, True
         
     except requests.exceptions.RequestException as e:
         print(f"Error calling API for query: {query}: {e}")
-        return None, None, False
+        return "", [], False
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON response for query: {query}: {e}")
-        return None, None, False
+        return "", [], False
 
 # Load test cases from JSON file
 test_cases_path = Path("app/ragas/test_cases/test_cases.json")
@@ -99,7 +112,7 @@ results_df = pd.DataFrame(results)
 ragas_data = pd.DataFrame({
     "user_input": results_df['user_input'],
     "reference": results_df['reference'],
-    "response": results_df['response'],
+    "response": results_df['response'].apply(lambda x: "" if x is None else x),
     "retrieved_contexts": results_df['context'].apply(lambda x: x if isinstance(x, list) else [])
 })
 
@@ -110,11 +123,16 @@ eval_dataset = EvaluationDataset.from_pandas(ragas_data)
 metrics = [
     LenientFactualCorrectness(),
     SemanticSimilarity(embeddings=evaluator_embeddings),
-    LLMContextRecall(llm=evaluator_llm),
-    Faithfulness(llm=evaluator_llm),
     BleuScore(),
     RougeScore()
 ]
+
+# Add LLM-dependent metrics only if LLM is available
+if evaluator_llm is not None:
+    metrics.extend([
+        LLMContextRecall(llm=evaluator_llm),
+        Faithfulness(llm=evaluator_llm)
+    ])
 
 print(ragas_data[['user_input', 'response', 'reference']])
 
