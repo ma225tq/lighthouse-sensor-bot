@@ -71,4 +71,68 @@ def test_connection():
         "status": "online"
     })
 
+@api_bp.route("/evaluate", methods=["POST"])
+def evaluate_endpoint():
+    data = request.get_json()
+    model_id = data.get('model_id')
+    question = data.get('question', '')
+    response = data.get('response', '')
+    
+    if not model_id:
+        return jsonify({"error": "Model ID is required"}), 400
+        
+    # Run the evaluation
+    try:
+        from app.ragas.scripts.ragas_tests import run_evaluation
+        from app.helpers.save_query_to_db import save_query_with_eval_to_db
+        import numpy as np
+        import math
+        
+        results, df = run_evaluation(model_id)
+        
+        # Fix NaN and numpy types in results before serializing to JSON
+        for key, value in results.items():
+            # Replace NaN values with 0
+            if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+                results[key] = 0.0
+            
+            # Convert numpy types to Python native types
+            if isinstance(value, np.bool_):
+                results[key] = bool(value)
+            elif isinstance(value, np.integer):
+                results[key] = int(value)
+            elif isinstance(value, np.floating):
+                if math.isnan(value) or math.isinf(value):
+                    results[key] = 0.0
+                else:
+                    results[key] = float(value)
+            elif isinstance(value, np.ndarray):
+                results[key] = value.tolist()
+        
+        # Check if there was an error
+        if isinstance(results, dict) and "error" in results:
+            # Still return 200 so frontend can display the error message
+            return jsonify({
+                "error": f"Evaluation encountered an error: {results['error']}",
+                "results": results
+            }), 200
+        
+        # Try to save to database but continue if it fails
+        try:
+            save_query_with_eval_to_db(
+                query=question,
+                direct_response=response,
+                full_response=response,
+                evaluation_results=results,
+            )
+        except Exception as db_error:
+            print(f"Warning: Failed to save to database: {db_error}")
+            # Continue even if database save fails
+        
+        return jsonify({"results": results})
+    except Exception as e:
+        error_message = f"Error during evaluation: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
+
  

@@ -1,4 +1,18 @@
 import { useState, useEffect } from "react";
+import { useTable } from 'react-table';
+import { useMemo } from 'react';
+import { marked } from 'marked'; // Import the marked library
+
+// Define the markdownToHtml function
+const markdownToHtml = (markdown) => {
+  if (!markdown) return '';
+  try {
+    return marked(markdown);
+  } catch (error) {
+    console.error('Error parsing markdown:', error);
+    return markdown; // Return the original text if parsing fails
+  }
+};
 
 export default function QuestionForm() {
   const [question, setQuestion] = useState("");
@@ -10,6 +24,7 @@ export default function QuestionForm() {
   const [selectedModel, setSelectedModel] = useState("qwen/qwen-2.5-72b-instruct"); // Default model
   const [modelUsed, setModelUsed] = useState(null);
   const [activeQuery, setActiveQuery] = useState(false);
+  const [evaluationResults, setEvaluationResults] = useState(null);
 
   useEffect(() => {
     // Check backend status on component mount
@@ -198,6 +213,139 @@ export default function QuestionForm() {
     }
   };
 
+  const evaluateModel = async () => {
+    if (!selectedModel) {
+      alert("Please select a model to evaluate");
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Show a simple loading message in the content area
+      setContent("Running model evaluation...");
+      
+      const response = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model_id: selectedModel
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        setContent(`## Error during evaluation\n${data.error}`);
+        setEvaluationResults(null);
+      } else {
+        // Store the results in state for the evaluation tab
+        setEvaluationResults(data.results);
+        
+        // Display only a simple success message in the content area
+        setContent("## Evaluation successful! ✓\n\nDetailed results available in the Evaluation tab.");
+      }
+      
+      // Switch to evaluation tab
+      switchTab('evaluation');
+    } catch (error) {
+      console.error("Error evaluating model:", error);
+      setContent(`## Error during evaluation\n${error.message}`);
+      setEvaluationResults(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const formatEvaluationResults = (results) => {
+    if (!results) {
+      return "No evaluation results available";
+    }
+    
+    let formattedResults = "## Model Evaluation Results\n\n";
+    
+    // Add metrics as a formatted table
+    formattedResults += "| Metric | Value |\n";
+    formattedResults += "|--------|-------|\n";
+    
+    // Loop through results and add each metric
+    Object.entries(results).forEach(([key, value]) => {
+      // Skip special fields or non-numeric values that aren't meant to be displayed
+      if (typeof value === 'number' && !['id', 'query_result_id'].includes(key)) {
+        // Format the metric name (convert snake_case to Title Case)
+        const formattedKey = key
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        
+        // Format the value to 2 decimal places if it's a number
+        const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
+        
+        formattedResults += `| ${formattedKey} | ${formattedValue} |\n`;
+      }
+    });
+    
+    // Add any contextual information if available
+    if (results.retrieved_contexts) {
+      formattedResults += "\n\n### Retrieved Contexts\n";
+      formattedResults += results.retrieved_contexts;
+    }
+    
+    return formattedResults;
+  };
+
+  // Add this function component for the evaluation results table
+  function EvaluationResultsTable({ results }) {
+    // Early return if no results
+    if (!results) return null;
+    
+    const metricsData = Object.entries(results)
+      .filter(([key, value]) => 
+        // Keep only numeric values and exclude specific metadata fields
+        (typeof value === 'number' || typeof value === 'boolean') && 
+        !['id', 'query_result_id', 'retrieved_contexts', 'reference'].includes(key)
+      );
+    
+    return (
+      <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 shadow">
+        <table className="w-full border-collapse bg-white text-left">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-4 py-3 text-sm font-medium text-gray-900">Metric</th>
+              <th scope="col" className="px-4 py-3 text-sm font-medium text-gray-900">Value</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 border-t border-gray-100">
+            {metricsData.map(([key, value]) => (
+              <tr key={key} className="hover:bg-gray-50">
+                <td className="px-4 py-2 text-sm font-medium text-gray-700">
+                  {formatMetricName(key)}
+                </td>
+                <td className="px-4 py-2 text-sm text-gray-700">
+                  {typeof value === 'number' ? value.toFixed(2) : String(value)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // Helper function to format metric names
+  const formatMetricName = (key) => {
+    return key
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   return (
     <div className="bg-ferry-image min-h-screen">
       <header className="pt-4">
@@ -346,12 +494,23 @@ export default function QuestionForm() {
                     onClick={askQuestion}
                     disabled={isLoading || !question.trim()}
                   >
-                    <span>Analyze</span>
+                    <span>Submit Query</span>
                     <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                     </svg>
                   </button>
                 </div>
+                
+                <button 
+                  className="w-full flex items-center justify-center px-4 py-2 mt-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  onClick={evaluateModel}
+                  disabled={isLoading}
+                >
+                  <span>Evaluate Model</span>
+                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                  </svg>
+                </button>
                 
                 {activeQuery && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
@@ -399,7 +558,19 @@ export default function QuestionForm() {
                     </div>
                   ) : content ? (
                     <div className="prose prose-sm max-w-none text-gray-800">
-                      <div dangerouslySetInnerHTML={{ __html: content }}></div>
+                      <div className="markdown-content">
+                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(content) }}></div>
+                        
+                        {/* Remove the evaluation table from here */}
+                        {/* DELETE OR COMMENT OUT THESE LINES:
+                        {evaluationResults && (
+                          <div className="mt-6">
+                            <h3 className="text-lg font-semibold mb-2">Detailed Metrics</h3>
+                            <EvaluationResultsTable results={evaluationResults} />
+                          </div>
+                        )}
+                        */}
+                      </div>
                     </div>
                   ) : (
                     <div className="text-gray-500 text-sm text-center py-4">
@@ -441,7 +612,27 @@ export default function QuestionForm() {
                     <div id="evaluation-content" className="tab-pane active">
                       <div className="h-full w-full flex items-center justify-center">
                         <div id="evaluation-data-container" className="w-full h-full">
-                          <p className="text-gray-300 text-center">Evaluation data will be loaded from backend</p>
+                          {evaluationResults ? (
+                            <div className="p-4">
+                              <div className="mb-4 text-center">
+                                <h3 className="text-lg font-semibold">Evaluation Results for {selectedModel}</h3>
+                                <p className="text-green-600 font-medium">Evaluation successful!</p>
+                              </div>
+                              <EvaluationResultsTable results={evaluationResults} />
+                              
+                              {/* If there are retrieved contexts, display them */}
+                              {evaluationResults.retrieved_contexts && (
+                                <div className="mt-6">
+                                  <h4 className="text-md font-semibold mb-2">Retrieved Contexts</h4>
+                                  <div className="bg-gray-50 p-3 rounded text-sm">
+                                    {evaluationResults.retrieved_contexts}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-center">Evaluation data will be loaded from backend</p>
+                          )}
                         </div>
                       </div>
                     </div>

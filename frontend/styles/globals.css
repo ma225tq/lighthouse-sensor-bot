@@ -319,7 +319,6 @@ select:hover,
 .active-analysis-container h2,
 .active-analysis-container h3 {
   color: rgba(0, 0, 0, 0.8);
-  background-color: rgba(255, 255, 255, 0.4);
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
   margin: -0.25rem -0.25rem 0.5rem -0.25rem;
