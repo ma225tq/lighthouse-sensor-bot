@@ -3,7 +3,6 @@ import { useWebSocket } from "../contexts/WebSocketContext";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import ReactMarkdown from 'react-markdown';
-import { useState, useEffect } from "react";
 import { useTable } from 'react-table';
 import { useMemo } from 'react';
 import { marked } from 'marked'; // Import the marked library
@@ -30,6 +29,7 @@ export default function QuestionForm() {
   const [modelUsed, setModelUsed] = useState(null);
   const [activeQuery, setActiveQuery] = useState(false);
   const [fullResponse, setFullResponse] = useState(null);
+  const [evaluationResults, setEvaluationResults] = useState(null);
 
     // Get WebSocket context
     const { sqlQueries, queryStatus, resetQueries } = useWebSocket();
@@ -80,6 +80,22 @@ export default function QuestionForm() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    // Add styling for active tabs
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .tab-button.active {
+        border-bottom: 2px solid white;
+        font-weight: bold;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   const askQuestion = async () => {
     if (question.trim() === "") {
       setContent("Please enter a question");
@@ -113,11 +129,8 @@ export default function QuestionForm() {
       
       const data = await response.json();
       setContent(data.content);
-      setFullResponse(data.full_response);
-      setModelUsed(selectedModel); // Save the model used for this query.
-      
-      // Remove the line that switches to evaluation tab
-      // switchTab('evaluation');
+      setFullResponse(data.full_response || data.content);
+      setModelUsed(selectedModel);
     } catch (error) {
       console.error("Error asking question:", error);
       setContent("Error connecting to the backend: " + error.message);
@@ -189,12 +202,12 @@ export default function QuestionForm() {
   );
  // Add this function to handle tab switching
   const switchTab = (tabName) => {
-    // Remove active class from all tabs
-    document.querySelectorAll('.tab-button').forEach(tab => {
-      tab.classList.remove('active');
+    // Remove active class from all tab buttons
+    document.querySelectorAll('.tab-button').forEach(button => {
+      button.classList.remove('active');
     });
     
-    // Find the button for this tab and make it active
+    // Add active class to the selected tab button
     const tabButton = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
     if (tabButton) {
       tabButton.classList.add('active');
@@ -202,18 +215,18 @@ export default function QuestionForm() {
     
     // Hide all tab content
     document.querySelectorAll('.tab-pane').forEach(content => {
-      content.classList.remove('active');
       content.classList.add('hidden');
+      content.classList.remove('active');
     });
     
-    // Find the content for this tab and make it visible
+    // Show the selected tab content
     const tabContent = document.getElementById(`${tabName}-content`);
     if (tabContent) {
       tabContent.classList.remove('hidden');
       tabContent.classList.add('active');
-    } else {
-      console.warn(`Tab content for "${tabName}" not found`);
     }
+    
+    console.log(`Switching to tab: ${tabName}`); // Debugging
   };
 
   // Add a section to display SQL queries with syntax highlighting
@@ -301,8 +314,9 @@ export default function QuestionForm() {
     setIsLoading(true);
     
     try {
-      // Show a simple loading message in the content area
+      // Show a loading message in the content area
       setContent("Running model evaluation...");
+      setFullResponse("Running detailed model evaluation...");
       
       const response = await fetch("/api/evaluate", {
         method: "POST",
@@ -322,61 +336,74 @@ export default function QuestionForm() {
       
       if (data.error) {
         setContent(`## Error during evaluation\n${data.error}`);
+        setFullResponse(`# Evaluation Error\n\n${data.error}`);
         setEvaluationResults(null);
       } else {
         // Store the results in state for the evaluation tab
         setEvaluationResults(data.results);
         
-        // Display only a simple success message in the content area
+        // Create detailed full response for the full response tab
+        const detailedResponse = formatDetailedEvaluationResponse(data.results);
+        setFullResponse(detailedResponse);
+        
+        // Display simple success message in the content area
         setContent("## Evaluation successful! ✓\n\nDetailed results available in the Evaluation tab.");
+        
+        // Switch to evaluation tab automatically
+        switchTab('evaluation');
       }
-      
-      // Switch to evaluation tab
-      switchTab('evaluation');
     } catch (error) {
       console.error("Error evaluating model:", error);
       setContent(`## Error during evaluation\n${error.message}`);
+      setFullResponse(`# Evaluation Error\n\n${error.message}`);
       setEvaluationResults(null);
     } finally {
       setIsLoading(false);
     }
   };
   
-  const formatEvaluationResults = (results) => {
+  // Add this helper function to format the full response with detailed evaluation data
+  const formatDetailedEvaluationResponse = (results) => {
     if (!results) {
       return "No evaluation results available";
     }
     
-    let formattedResults = "## Model Evaluation Results\n\n";
+    let response = `# Complete Evaluation Results for ${selectedModel}\n\n`;
+    response += `## Overview\n\n`;
+    response += "These metrics evaluate the model's ability to correctly answer questions based on the provided data.\n\n";
     
-    // Add metrics as a formatted table
-    formattedResults += "| Metric | Value |\n";
-    formattedResults += "|--------|-------|\n";
+    // Format metrics as markdown table
+    response += "| Metric | Value |\n";
+    response += "|--------|-------|\n";
     
-    // Loop through results and add each metric
-    Object.entries(results).forEach(([key, value]) => {
-      // Skip special fields or non-numeric values that aren't meant to be displayed
-      if (typeof value === 'number' && !['id', 'query_result_id'].includes(key)) {
-        // Format the metric name (convert snake_case to Title Case)
-        const formattedKey = key
-          .split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        
-        // Format the value to 2 decimal places if it's a number
-        const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
-        
-        formattedResults += `| ${formattedKey} | ${formattedValue} |\n`;
-      }
-    });
+    // Add each metric to the table
+    Object.entries(results)
+      .filter(([key, value]) => 
+        (typeof value === 'number' || typeof value === 'boolean') && 
+        !['id', 'query_result_id', 'retrieved_contexts', 'reference'].includes(key)
+      )
+      .forEach(([key, value]) => {
+        const formattedKey = formatMetricName(key);
+        const formattedValue = typeof value === 'number' ? value.toFixed(2) : String(value);
+        response += `| ${formattedKey} | ${formattedValue} |\n`;
+      });
     
-    // Add any contextual information if available
+    // Add additional sections for contextual information
     if (results.retrieved_contexts) {
-      formattedResults += "\n\n### Retrieved Contexts\n";
-      formattedResults += results.retrieved_contexts;
+      response += "\n\n## Retrieved Contexts\n\n";
+      response += results.retrieved_contexts;
     }
     
-    return formattedResults;
+    // Add explanations of metrics
+    response += "\n\n## Metrics Explanation\n\n";
+    response += "- **Factual Correctness**: Measures how factually accurate the response is compared to ground truth.\n";
+    response += "- **Semantic Similarity**: Evaluates how semantically close the response is to the reference answer.\n";
+    response += "- **Context Recall**: Assesses how well relevant information from the context was used.\n";
+    response += "- **Faithfulness**: Measures whether claims in the response are supported by the context.\n";
+    response += "- **BLEU Score**: Text similarity metric based on n-gram precision.\n";
+    response += "- **ROUGE Score**: Recall-oriented text similarity metric.\n";
+    
+    return response;
   };
 
   // Add this function component for the evaluation results table
@@ -419,6 +446,14 @@ export default function QuestionForm() {
 
   // Helper function to format metric names
   const formatMetricName = (key) => {
+    // Special case for rouge_score with mode
+    if (key.includes('(mode=')) {
+      const baseName = key.split('(')[0];
+      const mode = key.match(/\(mode=(.*?)\)/)[1];
+      return `${formatMetricName(baseName)} (${mode})`;
+    }
+    
+    // Regular formatting for other metrics
     return key
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -637,19 +672,8 @@ export default function QuestionForm() {
                     </div>
                   ) : content ? (
                     <div className="prose prose-sm max-w-none text-gray-800">
-                      <ReactMarkdown>{content}</ReactMarkdown>
                       <div className="markdown-content">
                         <div dangerouslySetInnerHTML={{ __html: markdownToHtml(content) }}></div>
-                        
-                        {/* Remove the evaluation table from here */}
-                        {/* DELETE OR COMMENT OUT THESE LINES:
-                        {evaluationResults && (
-                          <div className="mt-6">
-                            <h3 className="text-lg font-semibold mb-2">Detailed Metrics</h3>
-                            <EvaluationResultsTable results={evaluationResults} />
-                          </div>
-                        )}
-                        */}
                       </div>
                     </div>
                   ) : (
@@ -790,7 +814,26 @@ export default function QuestionForm() {
                     <div id="evaluation-content" className="tab-pane hidden">
                       <div className="h-full w-full flex items-center justify-center">
                         <div id="evaluation-data-container" className="w-full h-full">
-                          <p className="text-gray-300 text-center">Evaluation data will be loaded from backend</p>
+                          {evaluationResults ? (
+                            <div className="p-4">
+                              <h2 className="text-xl font-semibold mb-4">EVALUATION RESULTS FOR {selectedModel.toUpperCase()}</h2>
+                              <p className="text-green-600 font-medium mb-4">Evaluation successful!</p>
+                              
+                              <EvaluationResultsTable results={evaluationResults} />
+                              
+                              {/* If there are retrieved contexts, display them */}
+                              {evaluationResults.retrieved_contexts && (
+                                <div className="mt-6">
+                                  <h4 className="text-md font-semibold mb-2">Retrieved Contexts</h4>
+                                  <div className="bg-gray-50 p-3 rounded text-sm">
+                                    {evaluationResults.retrieved_contexts}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-center mt-8">Evaluation data will be loaded from backend</p>
+                          )}
                         </div>
                       </div>
                     </div>
