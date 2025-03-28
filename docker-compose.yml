@@ -60,7 +60,8 @@ services:
     networks:
       - 2dv50e
     environment:
-     SERVER_URL: "http://backend:5000"
+      - DEV_MODE=true
+      - SERVER_URL="http://backend:5000"
     depends_on:
       - backend
 

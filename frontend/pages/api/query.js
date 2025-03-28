@@ -53,12 +53,21 @@ export default async function handler(req, res) {
       // Normalize the response format.
       if (data.response) {
         // If backend returns 'response' key, convert it to 'content'.
-        res.status(200).json({ content: data.response });
+        res.status(200).json({ 
+          content: data.response,
+          full_response: data.full_response || data.response 
+        });
       } else if (data.content) {
         // If backend already returns 'content' key, use it directly.
-        res.status(200).json({ content: data.content });
+        res.status(200).json({ 
+          content: data.content,
+          full_response: data.full_response || data.content 
+        });
       } else {
-        res.status(200).json({ content: "Response received but no content found" });
+        res.status(200).json({ 
+          content: "Response received but no content found",
+          full_response: data.full_response || "No full response available" 
+        });
       }
 
     } catch (error) {

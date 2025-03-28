@@ -8,6 +8,8 @@ import logging
 from contextlib import redirect_stdout
 from flask_cors import CORS
 
+from app.conf.websocket import socketio, init_socketio
+
 load_dotenv()  # Load environment variables (for OpenAI API key, etc.)
 from pathlib import Path
 
@@ -18,16 +20,18 @@ from app.services.agent import initialize_agent
 
 app = Flask(__name__)
 
+
 FRONTEND_URL = os.getenv("FRONTEND_URL")
-# Configure CORS to only allow requests from the frontend
-CORS(app, resources={r"/*": {"origins": FRONTEND_URL}})
+CORS(app, resources={r"/*": {"origins": [FRONTEND_URL, "http://localhost:3000"]}})
+
+
+init_socketio(app, [FRONTEND_URL, "http://localhost:3000"])
+
 # --- Configuration ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Get OpenAI API Key
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable not set.")
   
-print(OPENAI_API_KEY)
-
 # Set up directory paths
 cwd = Path(__file__).parent.resolve()  # Current working directory
 data_dir = cwd.parent.joinpath("data")  # Directory for data files
@@ -54,6 +58,10 @@ app.config['SEMANTIC_MODEL'] = load_json_from_file(data_dir.joinpath("semantic_m
 app.config['DATA_DIR'] = data_dir
 app.config['OUTPUT_DIR'] = output_dir
 
+# Setup websocket routes
+from app.routes.websocket import setup_websocket_routes
+setup_websocket_routes(socketio)
+
 # reminder for melker since he has the bad habit of always running wsl as root
 print('REMEMBER TO USE THE AGENT WITH APPROPRIATE PERMISSIONS!!!!')
 print('REMEMBER TO USE THE AGENT WITH APPROPRIATE PERMISSIONS!!!!')
@@ -61,4 +69,8 @@ print('REMEMBER TO USE THE AGENT WITH APPROPRIATE PERMISSIONS!!!!')
 print('REMEMBER TO USE THE AGENT WITH APPROPRIATE PERMISSIONS!!!!')
 print('REMEMBER TO USE THE AGENT WITH APPROPRIATE PERMISSIONS!!!!')
 
-app.run(host="0.0.0.0", port=5000, debug=True)
+# backend/run.py or backend/main.py
+from app.app import app, socketio
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True, host='0.0.0.0', allow_unsafe_werkzeug=True)

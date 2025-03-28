@@ -6,6 +6,9 @@ import io
 import logging
 from agno.utils.log import logger
 import re
+from flask_socketio import emit
+from app.conf.websocket import socketio
+from app.utils.websocket_logger import WebSocketLogHandler
 
 
 def query(data, data_dir=None, data_analyst=None, source_file=None):
@@ -49,12 +52,30 @@ def query(data, data_dir=None, data_analyst=None, source_file=None):
         log_handler = logging.StreamHandler(log_capture)
         log_handler.setLevel(logging.INFO)
         logger.addHandler(log_handler)
+        
+        # Add WebSocket log handler
+        websocket_handler = WebSocketLogHandler()
+        websocket_handler.setLevel(logging.INFO)
+        logger.addHandler(websocket_handler)
+        
+        # Emit event that query processing has started
+        try:
+            socketio.emit('query_status', {'status': 'started'}, namespace='/query')
+        except Exception as e:
+            print(f"Error emitting query_status: {e}")
 
         # Run the agent
-        response = data_analyst.run(question)  # type: ignore
-
-        # Remove the log handler
+        response = data_analyst.run(question)
+        
+        # Remove the log handlers
         logger.removeHandler(log_handler)
+        logger.removeHandler(websocket_handler)
+        
+        # Emit event that query processing has completed
+        try:
+            socketio.emit('query_status', {'status': 'completed'}, namespace='/query')
+        except Exception as e:
+            print(f"Error emitting query_status: {e}")
 
         # Extract SQL queries from log output
         log_output = log_capture.getvalue()
