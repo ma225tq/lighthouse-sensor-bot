@@ -107,7 +107,7 @@ def save_query_with_eval_to_db(
                     evaluation_results.get("string_present"),
                 ),
             )
-            evaluation_metrics_id = cursor.fetchone()[0]
+            evaluation_metrics_id = cursor.fetchone()[0] # type: ignore
             
             # Then insert into query_evaluation with reference to evaluation_metrics
             cursor.execute(

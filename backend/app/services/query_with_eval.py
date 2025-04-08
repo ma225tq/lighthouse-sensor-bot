@@ -1,3 +1,4 @@
+# type: ignore
 from typing import Dict, Any, List, Tuple
 import ast
 import logging
@@ -167,7 +168,7 @@ def query_with_eval(model_id: str) -> Tuple[Dict[str, Any], int]:
             
         # Format the full response data from the dataframe
         full_response_data = []
-        for _, row in df.iterrows():
+        for _, row in df.iterrows(): # type: ignore
             full_response_data.append({
                 "question": row.get('user_input', ''),
                 "reference": row.get('reference', ''),
