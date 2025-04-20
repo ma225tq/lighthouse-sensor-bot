@@ -452,8 +452,10 @@ export default function QuestionForm() {
     }
   };
 
-  // Add new function to run 10 iterations
-  const run10Iterations = async () => {
+  const iterations = 2;
+
+  // Add new function to run iterations
+  const runIterations = async () => {
     if (!selectedModel) {
       alert("Please select a model to evaluate");
       return;
@@ -461,12 +463,12 @@ export default function QuestionForm() {
 
     setIsLoading(true);
     switchTab('live-tool-calls');
-    setContent("Running 10 model evaluation iterations...");
+    setContent(`Running ${iterations} model evaluation iterations...`);
     resetQueries();
 
     try {
-      for (let i = 0; i < 10; i++) {
-        setContent(`Running iteration ${i+1} of 10...`);
+      for (let i = 0; i < iterations; i++) {
+        setContent(`Running iteration ${i+1} of ${iterations}...`);
         
         const response = await fetch("/api/evaluate", {
           method: "POST",
@@ -486,17 +488,17 @@ export default function QuestionForm() {
         
         // Update progress without using socketio directly
         // The backend will emit its own progress updates through the WebSocket connection
-        const progressPercent = ((i + 1) / 10) * 100;
+        const progressPercent = ((i + 1) / iterations) * 100;
         // Just update the content to show progress
-        setContent(`## Iteration ${i+1} of 10 completed (${progressPercent.toFixed(0)}%)\n\nRunning next iteration...`);
+        setContent(`## Iteration ${i+1} of ${iterations} completed (${progressPercent.toFixed(0)}%)\n\nRunning next iteration...`);
       }
       
-      setContent("## All 10 evaluation iterations completed! ✓\n\nCheck Model Performance dashboard to see aggregated results.");
+      setContent(`## All ${iterations} evaluation iterations completed! ✓\n\nCheck Model Performance dashboard to see aggregated results.`);
       
     } catch (error) {
-      console.error("Error during 10 iterations:", error);
-      setContent(`## Error during 10 iterations\n${error.message}`);
-      setFullResponse(`## Error during 10 iterations\n${error.message}`);
+      console.error(`Error during ${iterations} iterations:`, error);
+      setContent(`## Error during ${iterations} iterations\n${error.message}`);
+      setFullResponse(`## Error during ${iterations} iterations\n${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -802,10 +804,10 @@ export default function QuestionForm() {
                       
                       <button
                         className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        onClick={run10Iterations}
+                        onClick={runIterations}
                         disabled={isLoading}
                       >
-                        <span>Kör 10 iterationer</span>
+                        <span>Run {iterations} iterations</span>
                         <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>

@@ -30,7 +30,7 @@ SELECT
     qr.sql_queries,
     qr."timestamp" AS query_timestamp,
     em.id AS evaluation_metric_id,
-    em.factuall_correctness,
+    em.factual_correctness,
     em.semantic_similarity,
     em.context_recall,
     em.faithfulness,
