@@ -452,6 +452,58 @@ export default function QuestionForm() {
     }
   };
 
+  const iterations = 2;
+
+  // Add new function to run iterations
+  const runIterations = async () => {
+    if (!selectedModel) {
+      alert("Please select a model to evaluate");
+      return;
+    }
+
+    setIsLoading(true);
+    switchTab('live-tool-calls');
+    setContent(`Running ${iterations} model evaluation iterations...`);
+    resetQueries();
+
+    try {
+      for (let i = 0; i < iterations; i++) {
+        setContent(`Running iteration ${i+1} of ${iterations}...`);
+        
+        const response = await fetch("/api/evaluate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model_id: selectedModel
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status} in iteration ${i+1}`);
+        }
+
+        await response.json(); // We don't need to process each response, just wait for completion
+        
+        // Update progress without using socketio directly
+        // The backend will emit its own progress updates through the WebSocket connection
+        const progressPercent = ((i + 1) / iterations) * 100;
+        // Just update the content to show progress
+        setContent(`## Iteration ${i+1} of ${iterations} completed (${progressPercent.toFixed(0)}%)\n\nRunning next iteration...`);
+      }
+      
+      setContent(`## All ${iterations} evaluation iterations completed! ✓\n\nCheck Model Performance dashboard to see aggregated results.`);
+      
+    } catch (error) {
+      console.error(`Error during ${iterations} iterations:`, error);
+      setContent(`## Error during ${iterations} iterations\n${error.message}`);
+      setFullResponse(`## Error during ${iterations} iterations\n${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   function EvaluationResultsTable({ results }) {
     if (!results) {
       // console.log("No evaluation results provided");
@@ -738,16 +790,29 @@ export default function QuestionForm() {
                       </div>
                     </div>
 
-                    <button
-                      className="w-full flex items-center justify-center px-4 py-2 mt-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                      onClick={evaluateModel}
-                      disabled={isLoading}
-                    >
-                      <span>Evaluate Model</span>
-                      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                      </svg>
-                    </button>
+                    <div className="flex flex-col space-y-3 mt-3">
+                      <button
+                        className="w-full flex items-center justify-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                        onClick={evaluateModel}
+                        disabled={isLoading}
+                      >
+                        <span>Evaluate Model (Single Run)</span>
+                        <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                      </button>
+                      
+                      <button
+                        className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        onClick={runIterations}
+                        disabled={isLoading}
+                      >
+                        <span>Run {iterations} iterations</span>
+                        <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                      </button>
+                    </div>
                   </>
                 )}
 
