@@ -13,7 +13,7 @@ SELECT
     lm.name as model_name,
     lm.type as model_type,
 
-    AVG(em.factual_correctness) FILTER (WHERE em.factual_correctness IS NOT NULL) as avg_factual_correctness,
+    AVG(em.factuall_correctness) FILTER (WHERE em.factuall_correctness IS NOT NULL) as avg_factual_correctness,
     AVG(em.semantic_similarity) FILTER (WHERE em.semantic_similarity IS NOT NULL) as avg_semantic_similarity,
     AVG(em.context_recall) FILTER (WHERE em.context_recall IS NOT NULL) as avg_context_recall,
     AVG(em.faithfulness) FILTER (WHERE em.faithfulness IS NOT NULL) as avg_faithfulness,
@@ -22,7 +22,7 @@ SELECT
     AVG(em.rogue_score) FILTER (WHERE em.rogue_score IS NOT NULL) as avg_rogue_score,
     AVG(em.string_present) FILTER (WHERE em.string_present IS NOT NULL) as avg_string_present, 
 
-    STDDEV_SAMP(em.factual_correctness) FILTER (WHERE em.factual_correctness IS NOT NULL) as stddev_factual_correctness,
+    STDDEV_SAMP(em.factuall_correctness) FILTER (WHERE em.factuall_correctness IS NOT NULL) as stddev_factual_correctness,
     STDDEV_SAMP(em.semantic_similarity) FILTER (WHERE em.semantic_similarity IS NOT NULL) as stddev_semantic_similarity,
     STDDEV_SAMP(em.context_recall) FILTER (WHERE em.context_recall IS NOT NULL) as stddev_context_recall,
     STDDEV_SAMP(em.faithfulness) FILTER (WHERE em.faithfulness IS NOT NULL) as stddev_faithfulness,

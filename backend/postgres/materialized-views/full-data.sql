@@ -8,6 +8,19 @@ DROP FUNCTION IF EXISTS refresh_full_query_data();
 
 DROP MATERIALIZED VIEW IF EXISTS full_query_data;
 
+-- Check if timestamp column exists, if not add it
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'query_result' 
+        AND column_name = 'timestamp'
+    ) THEN
+        ALTER TABLE public.query_result ADD COLUMN "timestamp" timestamp without time zone DEFAULT now() NOT NULL;
+    END IF;
+END $$;
+
 CREATE MATERIALIZED VIEW full_query_data AS
 SELECT
     qr.id AS query_result_id,
@@ -17,7 +30,7 @@ SELECT
     qr.sql_queries,
     qr."timestamp" AS query_timestamp,
     em.id AS evaluation_metric_id,
-    em.factual_correctness,
+    em.factuall_correctness,
     em.semantic_similarity,
     em.context_recall,
     em.faithfulness,

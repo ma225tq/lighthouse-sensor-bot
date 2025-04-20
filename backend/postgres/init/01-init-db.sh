@@ -37,3 +37,11 @@ else
     echo "llm_models table already has data. Skipping initialization."
   fi
 fi
+
+# Always attempt to create/update materialized views
+echo "Creating/updating materialized views..."
+for SQL_FILE in /docker-entrypoint-initdb.d/materialized-views/*.sql; do
+  echo "Executing $SQL_FILE..."
+  psql -v ON_ERROR_STOP=0 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f "$SQL_FILE"
+done
+echo "Materialized views processing completed."
