@@ -20,6 +20,7 @@ export default function QuestionForm() {
   const { sqlQueries, queryStatus, resetQueries, evaluationProgress } = useWebSocket();
   const [controlMode, setControlMode] = useState("query"); // "query" or "evaluation"
   const [testCases, setTestCases] = useState(null);
+  const [multiRunResults, setMultiRunResults] = useState([]);
 
   const [queryModeState, setQueryModeState] = useState({
     content: null,
@@ -33,6 +34,7 @@ export default function QuestionForm() {
     content: null,
     fullResponse: null,
     evaluationResults: null,
+    multiRunResults: [],
     sqlQueries: [],
     activeQuery: false
   });
@@ -115,6 +117,7 @@ export default function QuestionForm() {
         content,
         fullResponse,
         evaluationResults,
+        multiRunResults,
         sqlQueries,
         activeQuery
       });
@@ -154,6 +157,7 @@ export default function QuestionForm() {
       setContent(evaluationModeState.content);
       setFullResponse(evaluationModeState.fullResponse);
       setEvaluationResults(evaluationModeState.evaluationResults);
+      setMultiRunResults(evaluationModeState.multiRunResults || []);
       setActiveQuery(evaluationModeState.activeQuery);
 
       // Reset SQL queries display to show evaluation mode queries
@@ -396,6 +400,7 @@ export default function QuestionForm() {
           content: `## Error during evaluation\n${data.error}`,
           fullResponse: `## Error during evaluation\n${data.error}`,
           evaluationResults: null,
+          multiRunResults: [],
           sqlQueries: sqlQueries,
           activeQuery: true
         });
@@ -412,6 +417,7 @@ export default function QuestionForm() {
           content: "## Evaluation successful! ✓\n\nDetailed results available in the Evaluation tab.",
           fullResponse: data.full_response || null,
           evaluationResults: data.results,
+          multiRunResults: [],
           sqlQueries: sqlQueries,
           activeQuery: true
         });
@@ -447,6 +453,85 @@ export default function QuestionForm() {
       setContent(`## Error during evaluation\n${error.message}`);
       setFullResponse(`## Error during evaluation\n${error.message}`);
       setEvaluationResults(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const evaluateModelMultipleTimes = async (runCount = 2) => {
+    if (!selectedModel) {
+      alert("Please select a model to evaluate");
+      return;
+    }
+
+    setIsLoading(true);
+    switchTab('live-tool-calls');
+
+    try {
+      setContent(`Running model evaluation ${runCount} times...`);
+      resetQueries();
+      
+      const allResults = [];
+      
+      for(let i = 0; i < runCount; i++) {
+        setContent(`Running evaluation ${i + 1} of ${runCount}...`);
+        
+        const response = await fetch("/api/evaluate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model_id: selectedModel
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        allResults.push(data.results);
+      }
+      
+      setMultiRunResults(allResults);
+      setContent(`## Multiple evaluations successful! ✓\n\nDetailed results available in the Evaluation tab.`);
+      
+      // Update evaluation mode state
+      setEvaluationModeState({
+        content: `## Multiple evaluations successful! ✓\n\nDetailed results available in the Evaluation tab.`,
+        fullResponse: null,
+        evaluationResults: null, // Single evaluation result is null since we're using multiRunResults
+        multiRunResults: allResults,
+        sqlQueries: sqlQueries,
+        activeQuery: true
+      });
+      
+      // Switch to evaluation tab
+      setTimeout(() => {
+        switchTab('evaluation');
+        const evaluationContent = document.getElementById('evaluation-content');
+        if (evaluationContent) {
+          document.querySelectorAll('.tab-pane').forEach(content => {
+            content.classList.remove('active');
+            content.classList.add('hidden');
+          });
+
+          evaluationContent.classList.remove('hidden');
+          evaluationContent.classList.add('active');
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error("Error evaluating model multiple times:", error);
+      setContent(`## Error during multiple evaluations\n${error.message}`);
+      setFullResponse(`## Error during multiple evaluations\n${error.message}`);
+      setMultiRunResults([]);
     } finally {
       setIsLoading(false);
     }
@@ -748,6 +833,17 @@ export default function QuestionForm() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                       </svg>
                     </button>
+
+                    <button
+                      className="w-full flex items-center justify-center px-4 py-2 mt-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      onClick={() => evaluateModelMultipleTimes(2)}
+                      disabled={isLoading}
+                    >
+                      <span>Evaluate Model Twice</span>
+                      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                      </svg>
+                    </button>
                   </>
                 )}
 
@@ -942,7 +1038,30 @@ export default function QuestionForm() {
                     <div id="evaluation-content" className="tab-pane hidden">
                       <div className="h-full w-full flex items-center justify-center">
                         <div id="evaluation-data-container" className="w-full h-full">
-                          {evaluationResults ? (
+                          {multiRunResults && multiRunResults.length > 0 ? (
+                            <div className="p-4">
+                              <div className="mb-4 text-center">
+                                <h3 className="text-lg font-semibold">Multiple Evaluation Results for {selectedModel}</h3>
+                                <p className="text-green-600 font-medium">Multiple evaluations successful!</p>
+                              </div>
+                              
+                              {multiRunResults.map((result, index) => (
+                                <div key={index} className="mb-6">
+                                  <h4 className="text-md font-semibold mb-2">Run {index + 1}</h4>
+                                  <EvaluationResultsTable results={result} />
+                                  
+                                  {result.retrieved_contexts && (
+                                    <div className="mt-3">
+                                      <h5 className="text-sm font-semibold mb-1">Retrieved Contexts</h5>
+                                      <div className="bg-gray-50 p-3 rounded text-sm">
+                                        {result.retrieved_contexts}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : evaluationResults ? (
                             <div className="p-4">
                               <div className="mb-4 text-center">
                                 <h3 className="text-lg font-semibold">Evaluation Results for {selectedModel}</h3>
@@ -950,7 +1069,6 @@ export default function QuestionForm() {
                               </div>
                               <EvaluationResultsTable results={evaluationResults} />
 
-                              {/* If there are retrieved contexts, display them */}
                               {evaluationResults.retrieved_contexts && (
                                 <div className="mt-6">
                                   <h4 className="text-md font-semibold mb-2">Retrieved Contexts</h4>
