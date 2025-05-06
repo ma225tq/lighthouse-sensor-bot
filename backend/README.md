@@ -6,7 +6,7 @@ openai/gpt-4o-2024-11-20
 
 anthropic/claude-3.7-sonnet
 
-google/gemini-2.0-flash-001
+google/gemini-2.5-flash-preview
 
 amazon/nova-pro-v1
 

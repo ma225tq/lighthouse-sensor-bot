@@ -716,7 +716,7 @@ export default function QuestionForm() {
                           <>
                             <option value="openai/gpt-4o-2024-11-20">OpenAI GPT-4o</option>
                             <option value="anthropic/claude-3.7-sonnet">Claude 3.7 Sonnet</option>
-                            <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+                            <option value="google/gemini-2.5-flash-preview">Gemini 2.5</option>
                             <option value="amazon/nova-pro-v1">Amazon Nova Pro</option>
                           </>
                         ) : (
