@@ -1,10 +1,10 @@
 [
   {
-    "user_input": "What is the total fuel cost for ferry Jupiter in January 2024 assuming that the price per liter is 20 sek?",
+    "user_input": "What is the total fuel cost for ferry Jupiter in January 2024 assuming that the price per liter is 20 SEK?",
     "reference_contexts": [
       "Total fuel consumption for ferry Jupiter in January 2024: 12709.34 liters"
     ],
-    "reference": "Total fuel cost for ferry Jupiter in January 2024: 254186.70 SEK",
+    "reference": "Total fuel cost for ferry Jupiter in January 2024: 254186.8 SEK",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   }
 ]

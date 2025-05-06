@@ -23,7 +23,7 @@ SELECT
     em.faithfulness,
     em.bleu_score,
     em.non_llm_string_similarity,
-    em.rogue_score,
+    em.rouge_score,
     em.string_present,
     m.name AS model_name,
     tu.id AS token_usage_id,

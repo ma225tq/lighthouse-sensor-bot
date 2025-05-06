@@ -104,7 +104,7 @@ CREATE TABLE public.evaluation_metrics (
     faithfulness numeric,
     bleu_score numeric,
     non_llm_string_similarity numeric,
-    rogue_score numeric,
+    rouge_score numeric,
     string_present numeric
 );
 
@@ -220,7 +220,7 @@ CREATE MATERIALIZED VIEW public.full_query_data AS
     em.faithfulness,
     em.bleu_score,
     em.non_llm_string_similarity,
-    em.rogue_score,
+    em.rouge_score,
     em.string_present,
     m.name AS model_name,
     tu.id AS token_usage_id,
@@ -277,7 +277,7 @@ CREATE MATERIALIZED VIEW public.model_performance_metrics AS
     avg(em.faithfulness) FILTER (WHERE (em.faithfulness IS NOT NULL)) AS avg_faithfulness,
     avg(em.bleu_score) FILTER (WHERE (em.bleu_score IS NOT NULL)) AS avg_bleu_score,
     avg(em.non_llm_string_similarity) FILTER (WHERE (em.non_llm_string_similarity IS NOT NULL)) AS avg_non_llm_string_similarity,
-    avg(em.rogue_score) FILTER (WHERE (em.rogue_score IS NOT NULL)) AS avg_rogue_score,
+    avg(em.rouge_score) FILTER (WHERE (em.rouge_score IS NOT NULL)) AS avg_rouge_score,
     avg(em.string_present) FILTER (WHERE (em.string_present IS NOT NULL)) AS avg_string_present,
     stddev_samp(em.factual_correctness) FILTER (WHERE (em.factual_correctness IS NOT NULL)) AS stddev_factual_correctness,
     stddev_samp(em.semantic_similarity) FILTER (WHERE (em.semantic_similarity IS NOT NULL)) AS stddev_semantic_similarity,
@@ -285,7 +285,7 @@ CREATE MATERIALIZED VIEW public.model_performance_metrics AS
     stddev_samp(em.faithfulness) FILTER (WHERE (em.faithfulness IS NOT NULL)) AS stddev_faithfulness,
     stddev_samp(em.bleu_score) FILTER (WHERE (em.bleu_score IS NOT NULL)) AS stddev_bleu_score,
     stddev_samp(em.non_llm_string_similarity) FILTER (WHERE (em.non_llm_string_similarity IS NOT NULL)) AS stddev_non_llm_string_similarity,
-    stddev_samp(em.rogue_score) FILTER (WHERE (em.rogue_score IS NOT NULL)) AS stddev_rogue_score,
+    stddev_samp(em.rouge_score) FILTER (WHERE (em.rouge_score IS NOT NULL)) AS stddev_rouge_score,
     stddev_samp(em.string_present) FILTER (WHERE (em.string_present IS NOT NULL)) AS stddev_string_present,
     count(qe.id) AS query_evaluation_count,
     avg(tu.total_tokens) FILTER (WHERE (tu.total_tokens IS NOT NULL)) AS avg_total_tokens,

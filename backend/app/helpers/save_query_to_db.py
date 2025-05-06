@@ -91,7 +91,7 @@ def save_query_with_eval_to_db(
         "faithfulness": (float, int, type(None)),
         "bleu_score": (float, int, type(None)),
         "non_llm_string_similarity": (float, int, type(None)),
-        "rogue_score": (float, int, type(None)),
+        "rouge_score": (float, int, type(None)),
         "string_present": (float, int, type(None)),
     }
 
@@ -114,7 +114,7 @@ def save_query_with_eval_to_db(
                 INSERT INTO evaluation_metrics (
                     factual_correctness, semantic_similarity, context_recall, 
                     faithfulness, bleu_score, non_llm_string_similarity,
-                    rogue_score, string_present
+                    rouge_score, string_present
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
                 """,
                 (
@@ -124,7 +124,7 @@ def save_query_with_eval_to_db(
                     evaluation_results.get("faithfulness"),
                     evaluation_results.get("bleu_score"),
                     evaluation_results.get("non_llm_string_similarity"),
-                    evaluation_results.get("rogue_score"),
+                    evaluation_results.get("rouge_score"),
                     evaluation_results.get("string_present"),
                 ),
             )

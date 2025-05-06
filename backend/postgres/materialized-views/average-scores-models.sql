@@ -19,7 +19,7 @@ SELECT
     AVG(em.faithfulness) FILTER (WHERE em.faithfulness IS NOT NULL) as avg_faithfulness,
     AVG(em.bleu_score) FILTER (WHERE em.bleu_score IS NOT NULL) as avg_bleu_score,
     AVG(em.non_llm_string_similarity) FILTER (WHERE em.non_llm_string_similarity IS NOT NULL) as avg_non_llm_string_similarity,
-    AVG(em.rogue_score) FILTER (WHERE em.rogue_score IS NOT NULL) as avg_rogue_score,
+    AVG(em.rouge_score) FILTER (WHERE em.rouge_score IS NOT NULL) as avg_rouge_score,
     AVG(em.string_present) FILTER (WHERE em.string_present IS NOT NULL) as avg_string_present, 
 
     STDDEV_SAMP(em.factual_correctness) FILTER (WHERE em.factual_correctness IS NOT NULL) as stddev_factual_correctness,
@@ -28,7 +28,7 @@ SELECT
     STDDEV_SAMP(em.faithfulness) FILTER (WHERE em.faithfulness IS NOT NULL) as stddev_faithfulness,
     STDDEV_SAMP(em.bleu_score) FILTER (WHERE em.bleu_score IS NOT NULL) as stddev_bleu_score,
     STDDEV_SAMP(em.non_llm_string_similarity) FILTER (WHERE em.non_llm_string_similarity IS NOT NULL) as stddev_non_llm_string_similarity,
-    STDDEV_SAMP(em.rogue_score) FILTER (WHERE em.rogue_score IS NOT NULL) as stddev_rogue_score,
+    STDDEV_SAMP(em.rouge_score) FILTER (WHERE em.rouge_score IS NOT NULL) as stddev_rouge_score,
     STDDEV_SAMP(em.string_present) FILTER (WHERE em.string_present IS NOT NULL) as stddev_string_present,
 
     COUNT(qe.id) as query_evaluation_count,

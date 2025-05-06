@@ -138,7 +138,7 @@ def model_performance():
                             "id": "avg_non_llm_string_similarity",
                             "name": "String Similarity",
                         },
-                        {"id": "avg_rogue_score", "name": "ROUGE Score"},
+                        {"id": "avg_rouge_score", "name": "ROUGE Score"},
                         {"id": "avg_string_present", "name": "String Present"},
                     ],
                 }
