@@ -87,7 +87,7 @@ def query_with_eval(model_id: str) -> Tuple[Dict[str, Any], int]:
             'faithfulness': 'faithfulness',
             'bleu_score': 'bleu_score',
             'non_llm_string_similarity': 'non_llm_string_similarity',
-            'rouge_score(mode=fmeasure)': 'rogue_score',
+            'rouge_score(mode=fmeasure)': 'rouge_score',
             'string_present': 'string_present'
         }
         
