@@ -3,7 +3,7 @@
     "test_no": 1,
     "query": "What is the total fuel cost for ferry Jupiter in January 2024 assuming that the price per liter is 20 sek?",
     "reference_contexts": [
-      "Total fuel consumption for ferry Jupiter in January 2024: 12709.34 liters"
+      "Total fuel consumption for ferry Jupiter in January 2024: 12709.34 liters. Total fuel cost for ferry Jupiter in January 2024: 254186.70 SEK"
     ],
     "ground_truth": "Total fuel cost for ferry Jupiter in January 2024: 254186.70 SEK",
     "extracted_true_value": "254186.70",
@@ -21,32 +21,82 @@
   },
   {
     "test_no": 3,
-    "query": "Which route has the highest average distance travelled, considering both outbound and inbound directions?",
+    "query": "How many vehicles are on average left at the terminal for inbound trips?",
     "reference_contexts": [
-      "The route with the highest average distance travelled is: Aspöleden with an average distance of 3.22 NM."
+      "Analysis of Vehicles Left at Terminal for Inbound Trips: Average vehicles left at terminal per inbound trip: 0.3270"
     ],
-    "ground_truth": "The route with the highest average distance travelled is Aspöleden with an average distance of 3.22 NM",
-    "extracted_true_value": "3.22",
+    "ground_truth": " On average, 0.3270 vehicles are left at the terminal for inbound trips.",
+    "extracted_true_value": "0.3270",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
   {
     "test_no": 4,
-    "query": "What's the average number of vehicles left at terminals in July 2023 in Ljusterö terminal?",
+    "query": "How many vehicles on average are left at the terminal per trip for ferry Jupiter during June, July and August?",
     "reference_contexts": [
-      "Average Vehicles Left at Terminals Per Month: Ljusterö terminal in July 2023 (2023-07) had 23.353470 total vehicles outbound"
+      "Total vehicles left at the terminal for ferry Jupiter during June, July and August: 199263. Total number of trips for ferry Jupiter during these months: 4611. The average amount of vehicles left at the terminal per trip for ferry Jupiter during these months: 43.21"
     ],
-    "ground_truth": "The average number of vehicles left at Ljusterö terminal in July 2023 was 23.35 vehicles",
-    "extracted_true_value": "23.35",
+    "ground_truth": "The average amount of vehicles left at the terminal per trip for ferry Jupiter during these months: 43.21",
+    "extracted_true_value": "43.21",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
   {
     "test_no": 5,
-    "query": "Which route has the highest vehicle throughput per day?",
+    "query": "Which route has the highest average distance travelled, considering both outbound and inbound directions?",
     "reference_contexts": [
-      "Route(s) with the overall highest daily throughput: Ljusteröleden with 1840 vehicles. All routes with their highest daily throughput: Aspöleden: 351, Furusundsleden: 1794, Ljusteröleden: 1840, Oxdjupsleden: 841, Vaxholmsleden: 1387"
+      "Average distances by route (in nautical miles):  Aspöleden: 3.22 NM, Ljusteröleden: 0.57 NM, Vaxholmsleden: 0.49 NM, Oxdjupsleden: 0.25 NM, Furusundsleden: 0.23 NM. The route with the highest average distance travelled is: Aspöleden with an average distance of 3.22 NM."
     ],
-    "ground_truth": "The route with the highest vehicle throughput per day is Ljusteröleden with 1840 vehicles",
-    "extracted_true_value": "1840",
+    "ground_truth": "The route with the highest average distance travelled is: Aspöleden with an average distance of 3.22 NM.",
+    "extracted_true_value": "3.22",
+    "synthesizer_name": "single_hop_specifc_query_synthesizer"
+  },
+  {
+    "test_no": 6,
+    "query": "What is the average distance travelled on Ljusteröleden?",
+    "reference_contexts": [
+      "The average distance travelled on Ljusteröleden is: 0.57 NM."
+    ],
+    "ground_truth": "The average distance travelled on Ljusteröleden is: 0.57 NM.",
+    "extracted_true_value": "0.57",
+    "synthesizer_name": "single_hop_specifc_query_synthesizer"
+  },
+  {
+    "test_no": 7,
+    "query": "What is the PCE for the peak hour for route Aspöleden in February?",
+    "reference_contexts": [
+      "Outbound peak: Hour 12.0:00 with 701.00 PCE. Inbound peak: Hour 12.0:00 with 791.00 PCE. The average PCE for the peak hour is: 1492.00. The peak hour has a total PCE of 1492.00"
+    ],
+    "ground_truth": "The peak hour has a total PCE of 1492.00",
+    "extracted_true_value": "1492.00",
+    "synthesizer_name": "single_hop_specifc_query_synthesizer"
+  },
+  {
+    "test_no": 8,
+    "query": "What is the average fuel consumption on the route Ljusterö to Östanå, combining both outbound and inbound?",
+    "reference_contexts": [
+      "Average outbound (Ljusterö to Östanå): 7.00 liters. Average inbound (Östanå to Ljusterö): 6.98 liters. The average combined fuel consumption on the route Ljusterö to Östanå: 13.98 liters per trip"
+    ],
+    "ground_truth": "The average combined fuel consumption on the route Ljusterö to Östanå: 13.98 liters per trip",
+    "extracted_true_value": "13.98",
+    "synthesizer_name": "single_hop_specifc_query_synthesizer"
+  },
+  {
+    "test_no": 9,
+    "query": "What is the average trip duration for Oxdjupsleden?",
+    "reference_contexts": [
+      "Average Trip Duration for Oxdjupsleden: Outbound: 3.16 minutes. Inbound: 3.09 minutes. The average trip duration is 3.12 minutes"
+    ],
+    "ground_truth": "The average trip duration is 3.12 minutes",
+    "extracted_true_value": "3.12",
+    "synthesizer_name": "single_hop_specifc_query_synthesizer"
+  },
+  {
+    "test_no": 10,
+    "query": "Which ferry has the best fuel efficiency, and what is its liters per nautical mile?",
+    "reference_contexts": [
+      "Fuel Efficiency Analysis (liters per nautical mile): Lower values indicate better fuel efficiency: Merkurius: 6.08 L/NM. Nina: 8.37 L/NM. Yxlan: 10.82 L/NM. Fragancia: 11.92 L/NM. Jupiter: 12.30 L/NM. The most fuel-efficient ferry is: Merkurius: 6.08 L/NM"
+    ],
+    "ground_truth": "The most fuel-efficient ferry is: Merkurius: 6.08 L/NM",
+    "extracted_true_value": " 6.08",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   }
 ]

@@ -42,7 +42,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-          - 5000:5000
+      - 5000:5000
     networks:
       - lighthouse
     environment:
@@ -53,6 +53,8 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_PORT=${DB_PORT}
       - SERVER_URL=${SERVER_URL}
+    volumes:
+      - ./backend/app/ragas/test_cases:/app/app/ragas/test_cases
     depends_on:
       - postgres
 
