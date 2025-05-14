@@ -61,9 +61,9 @@
   },
   {
     "test_no": 7,
-    "query": "What is the PCE for the peak hour for route Aspöleden in February?",
+    "query": "What is the total Passenger Car Equivalent (PCE) during the peak hour for route Aspöleden in February, combining both outbound and inbound directions?",
     "reference_contexts": [
-      "Outbound peak: Hour 12.0:00 with 701.00 PCE. Inbound peak: Hour 12.0:00 with 791.00 PCE. The average PCE for the peak hour is: 1492.00. The peak hour has a total PCE of 1492.00"
+      "Peak hour analysis for Aspöleden in February: Outbound peak: Hour 12.0:00 with 701.00 PCE. Inbound peak: Hour 12.0:00 with 791.00 PCE. The average PCE for the peak hour is: 1492.00. The peak hour has a total PCE of 1492.00"
     ],
     "ground_truth": "The peak hour has a total PCE of 1492.00",
     "extracted_true_value": "1492.00",

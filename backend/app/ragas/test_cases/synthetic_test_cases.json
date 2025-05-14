@@ -1,12 +1,12 @@
 [
   {
-    "test_no": 4,
-    "query": "How many vehicles are on average unable to board (left behind at the terminal) per trip for ferry Jupiter during summer months (6, 7, 8)?",
+    "test_no": 10,
+    "query": "Which ferry has the best fuel efficiency, and what is its liters per nautical mile?",
     "reference_contexts": [
-      "Month 6 (June): 1512 trips. Month 7 (July): 1556 trips. Month 8 (August): 1543 trips. Total vehicles left at terminal (unable to board) for ferry Jupiter during months 6, 7, 8: 14594. Total number of trips for ferry Jupiter during these months: 4611. The average number of vehicles left at the terminal per trip: 3.17"
+      "Fuel Efficiency Analysis (liters per nautical mile): Lower values indicate better fuel efficiency: Merkurius: 6.08 L/NM. Nina: 8.37 L/NM. Yxlan: 10.82 L/NM. Fragancia: 11.92 L/NM. Jupiter: 12.30 L/NM. The most fuel-efficient ferry is: Merkurius: 6.08 L/NM"
     ],
-    "ground_truth": "The average number of vehicles left at the terminal per trip: 3.17",
-    "extracted_true_value": "3.17",
+    "ground_truth": "The most fuel-efficient ferry is: Merkurius: 6.08 L/NM",
+    "extracted_true_value": " 6.08",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   }
 ]
