@@ -10,7 +10,7 @@ from langchain.docstore.document import Document
 import json
 
 # Load CSV data
-df = pd.read_csv("data/ferry_trips_data.csv")
+df = pd.read_csv("data/ferry_trips_data_large.csv")
 
 # Load semantic model
 with open("data/semantic_model.json", "r") as f:

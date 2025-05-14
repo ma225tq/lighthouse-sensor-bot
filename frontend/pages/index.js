@@ -11,7 +11,7 @@ export default function QuestionForm() {
   const [content, setContent] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [backendStatus, setBackendStatus] = useState("offline");
-  const [sourceFile, setSourceFile] = useState("ferry_trips_data.csv");
+  const [sourceFile, setSourceFile] = useState("ferry_trips_data_large.csv");
   const [modelCategory, setModelCategory] = useState("open-source");
   const [selectedModel, setSelectedModel] = useState("qwen/qwen-2.5-72b-instruct");
   const [modelUsed, setModelUsed] = useState(null);

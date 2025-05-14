@@ -72,7 +72,7 @@ def run_test_case(query: str, llm_model_id: str, test_no: Optional[str] = None) 
         # Directly call the internal processing function instead of making an API call
         result = process_query_internal(
             question=query,
-            source_file="ferry_trips_data.csv", 
+            source_file="ferry_trips_data_large.csv", 
             llm_model_id=llm_model_id,
             save_to_db=False  # Don't save this to DB, we'll do it ourselves later
         )

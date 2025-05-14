@@ -197,4 +197,4 @@ for ferry in tqdm(ferries, desc="Processing ferries"):
             ferry_trip_data.loc[row_mask, "start_time_inbound"] = start_time_inbound
             ferry_trip_data.loc[row_mask, "end_time_inbound"] = end_time_inbound
 
-ferry_trip_data.to_csv("ferry_trips_data.csv", index=False)
+ferry_trip_data.to_csv("ferry_trips_data_large.csv", index=False)

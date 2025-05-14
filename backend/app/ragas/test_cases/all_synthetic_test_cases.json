@@ -13,7 +13,7 @@
     "test_no": 2,
     "query": "What is the average speed of ferry Jupiter? (in km/h)",
     "reference_contexts": [
-      "The average speed of ferry Jupiter is: 6.23 knots. Average speed in km/h: 11.55 km/h. Average speed in mph: 7.17 mph"
+      "The average speed of ferry Jupiter is: 6.23 knots. Average speed in km/h: 11.55 km/h."
     ],
     "ground_truth": "Average speed in km/h is 11.55 km/h",
     "extracted_true_value": "11.55",
@@ -31,12 +31,12 @@
   },
   {
     "test_no": 4,
-    "query": "How many vehicles on average are left at the terminal per trip for ferry Jupiter during June, July and August?",
+    "query": "How many vehicles are on average unable to board (left behind at the terminal) per trip for ferry Jupiter during summer months (6, 7, 8)?",
     "reference_contexts": [
-      "Total vehicles left at the terminal for ferry Jupiter during June, July and August: 199263. Total number of trips for ferry Jupiter during these months: 4611. The average amount of vehicles left at the terminal per trip for ferry Jupiter during these months: 43.21"
+      "Month 6 (June): 1512 trips. Month 7 (July): 1556 trips. Month 8 (August): 1543 trips. Total vehicles left at terminal (unable to board) for ferry Jupiter during months 6, 7, 8: 14594. Total number of trips for ferry Jupiter during these months: 4611. The average number of vehicles left at the terminal per trip: 3.17"
     ],
-    "ground_truth": "The average amount of vehicles left at the terminal per trip for ferry Jupiter during these months: 43.21",
-    "extracted_true_value": "43.21",
+    "ground_truth": "The average number of vehicles left at the terminal per trip: 3.17",
+    "extracted_true_value": "3.17",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
   {

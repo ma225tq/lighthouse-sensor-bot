@@ -22,7 +22,7 @@ data_analyst = DuckDbAgent(
                         "The data corresponds to the time period between 2023-03-01 and 2024-02-29. "
                         "PONTOS-HUB launched on 2023-04-30, so the data contains datapoints corresponding to a period for "
                         "which PONTOS-HUB has no data.\n\n"
-                        "Each row in the `ferry_trips_data.csv` files contain fields describing 2 trips between two terminals:\n\n"
+                        "Each row in the `ferry_trips_data_large.csv` files contain fields describing 2 trips between two terminals:\n\n"
                         "- An `outbound` trip from the departure terminal to the arrival terminal.\n"
                         "- An `inbound` trip from the arrival terminal to the departure terminal.\n\n"
                         "The suffixes `outbound` and `inbound` in the field names indicate to which trip does the field correspond.\n\n"
@@ -49,7 +49,7 @@ data_analyst = DuckDbAgent(
                         "- `start_time_outbound/inbound`: Approximate start time of the outbound/inbound trip. Calculated from PONTOS-HUB data and given in CET.\n"
                         "- `end_time_outbound/inbound`: Approximate end time of the outbound/inbound trip. Calculated from PONTOS-HUB data and given in CET."
                     ),
-                    "path": "ferry_trips_data.csv",
+                    "path": "ferry_trips_data_large.csv",
         },
         {   
             "name": "ferries-info",
