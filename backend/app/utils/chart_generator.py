@@ -195,43 +195,63 @@ class ChartGenerator:
             logger.warning(f"No data found for metric: {metric_name}")
             return "No data available"
         
-        # Create the figure
-        plt.figure(figsize=(12, 8))
+        # Create the figure with white background
+        plt.figure(figsize=(14, 10), facecolor='white')
         
-        # Create a bar plot with error bars
+        # Create a bar plot with improved styling
+        # Use a different, darker color palette
+        colors = plt.cm.viridis(np.linspace(0, 0.8, len(df)))
+        
+        # Create a bar plot
         ax = sns.barplot(
             data=df,
             x='model_name',
             y='avg_score',
-            hue='model_name',  # Add hue parameter to avoid deprecation warning
-            legend=False       # Hide the legend since it's redundant
+            palette=colors
         )
         
         # Add labels and title
         formatted_metric = ' '.join(word.capitalize() for word in metric_name.split('_'))
-        plt.title(f'Average {formatted_metric} Score by Model', fontsize=16)
+        plt.title(f'Average {formatted_metric} Score by Model', fontsize=16, fontweight='bold')
         plt.xlabel('Model', fontsize=14)
         plt.ylabel(f'Average {formatted_metric}', fontsize=14)
+        
+        # Fix overlapping model names by rotating them vertically and adjusting figure size
+        plt.xticks(rotation=90, ha='center')
+        
+        # Set reasonable y-axis limits
+        max_score = df['avg_score'].max()
+        plt.ylim(0, min(1.0, max_score * 1.2))  # Cap at 1.0 or 20% above max score
+        
+        # Add grid for better readability
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
         
         # Add data labels on top of bars
         for p in ax.patches:
             ax.annotate(f'{p.get_height():.2f}', 
                       (p.get_x() + p.get_width() / 2., p.get_height()),
                       ha='center', va='bottom',
-                      fontsize=12)
+                      fontsize=12, fontweight='bold')
         
-        # Add the number of queries per model
+        # Add the number of queries per model at the bottom
         for i, count in enumerate(df['query_count']):
             ax.annotate(f'n={count}',
-                      (i, 0.02),
+                      (i, 0.01),
                       ha='center', va='bottom',
                       fontsize=10, color='gray')
+            
+        # Create shorter model names for the legend by cropping very long names
+        df['short_name'] = df['model_name'].apply(lambda x: 
+            (x[:25] + '...') if len(x) > 28 else x)
         
-        # Adjust layout
+        # Adjust layout to accommodate the rotated x labels
         plt.tight_layout()
         
-        # Save the figure
-        return self._save_figure(f"model_comparison_{metric_name}")
+        # Add padding at the bottom for model names
+        plt.subplots_adjust(bottom=0.25)
+        
+        # Save the figure with higher resolution
+        return self._save_figure(f"model_comparison_{metric_name}", dpi=300)
     
     def metric_comparison_chart(self, model_name: str) -> str:
         """
