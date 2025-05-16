@@ -1,0 +1,918 @@
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import psycopg2
+from contextlib import contextmanager
+from typing import List, Dict, Any, Optional, Tuple, Union
+import logging
+import decimal
+
+# Import our custom database configuration
+try:
+    from .db_config import get_connection_params
+    USE_CUSTOM_CONFIG = True
+except ImportError:
+    from app.conf.postgres import get_cursor
+    USE_CUSTOM_CONFIG = False
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+# Custom cursor context manager using our configuration
+@contextmanager
+def get_custom_cursor():
+    """Get a database cursor using custom configuration."""
+    conn = None
+    try:
+        db_params = get_connection_params()
+        conn = psycopg2.connect(
+            host=db_params['host'],
+            dbname=db_params['dbname'],
+            user=db_params['user'],
+            password=db_params['password'],
+            port=db_params['port']
+        )
+        cursor = conn.cursor()
+        yield cursor
+        conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise e
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+class ChartGenerator:
+    """
+    Utility class for generating charts from evaluation results stored in PostgreSQL.
+    These charts can be used for thesis or presentation purposes.
+    """
+    
+    def __init__(self, output_dir: str = None):
+        """
+        Initialize the chart generator.
+        
+        Args:
+            output_dir: Directory to save charts to. Defaults to 'output/charts' in the project root.
+        """
+        if output_dir is None:
+            # Get the project root directory
+            project_root = Path(__file__).parent.parent.parent.parent
+            self.output_dir = project_root / "output" / "charts"
+        else:
+            self.output_dir = Path(output_dir)
+            
+        # Create the output directory if it doesn't exist
+        os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Set default plot style
+        sns.set_theme(style="whitegrid")
+        
+    def _fetch_data(self, query: str) -> pd.DataFrame:
+        """
+        Fetch data from the database using the provided SQL query.
+        
+        Args:
+            query: SQL query to execute
+            
+        Returns:
+            DataFrame containing the query results
+        """
+        try:
+            # Use custom cursor or default cursor based on configuration
+            cursor_manager = get_custom_cursor if USE_CUSTOM_CONFIG else get_cursor
+            
+            with cursor_manager() as cursor:
+                cursor.execute(query)
+                columns = [desc[0] for desc in cursor.description]
+                data = cursor.fetchall()
+                
+            # Convert to DataFrame
+            df = pd.DataFrame(data, columns=columns)
+            
+            # Convert Decimal objects to floats for compatibility with matplotlib
+            for col in df.select_dtypes(include=['object']).columns:
+                # Check if the column contains Decimal objects
+                if df[col].first_valid_index() is not None and isinstance(
+                    df.loc[df[col].first_valid_index(), col], decimal.Decimal
+                ):
+                    df[col] = df[col].astype(float)
+            
+            return df
+        except Exception as e:
+            logger.error(f"Error fetching data: {e}")
+            raise
+    
+    def _save_figure(self, filename: str, fig: plt.Figure = None, dpi=300) -> str:
+        """
+        Save the current figure or a provided figure to the output directory.
+        
+        Args:
+            filename: Filename for the saved chart (without extension)
+            fig: Figure to save, if None the current figure is saved
+            dpi: Resolution for the saved image
+            
+        Returns:
+            Path to the saved file
+        """
+        file_path = self.output_dir / f"{filename}.png"
+        
+        if fig:
+            fig.savefig(file_path, dpi=dpi, bbox_inches='tight')
+        else:
+            plt.savefig(file_path, dpi=dpi, bbox_inches='tight')
+            
+        plt.close()
+        return str(file_path)
+    
+    def _sanitize_filename(self, filename: str) -> str:
+        """
+        Sanitize filename by replacing unsafe characters.
+        
+        Args:
+            filename: Original filename
+            
+        Returns:
+            Sanitized filename
+        """
+        # Replace slashes and other problematic characters
+        sanitized = filename.replace('/', '_').replace('\\', '_')
+        sanitized = sanitized.replace(':', '_').replace('*', '_')
+        sanitized = sanitized.replace('?', '_').replace('"', '_')
+        sanitized = sanitized.replace('<', '_').replace('>', '_')
+        sanitized = sanitized.replace('|', '_').replace(' ', '_')
+        return sanitized
+    
+    def model_comparison_chart(self, 
+                              metric_name: str = 'factual_correctness',
+                              model_names: List[str] = None) -> str:
+        """
+        Generate a bar chart comparing different models on a specific metric.
+        
+        Args:
+            metric_name: The name of the metric to compare (e.g., 'factual_correctness')
+            model_names: List of model names to include, if None all models are included
+            
+        Returns:
+            Path to the saved chart image
+        """
+        # Define the base query
+        query = f"""
+        SELECT 
+            m.name AS model_name,
+            AVG(em.{metric_name}) AS avg_score,
+            COUNT(*) AS query_count
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        """
+        
+        # Add filter for specific models if provided
+        if model_names and len(model_names) > 0:
+            model_filters = ", ".join([f"'{model}'" for model in model_names])
+            query += f"WHERE m.name IN ({model_filters})"
+            
+        # Group by model and sort by score
+        query += """
+        GROUP BY 
+            m.name
+        ORDER BY 
+            avg_score DESC
+        """
+        
+        # Fetch the data
+        df = self._fetch_data(query)
+        
+        if df.empty:
+            logger.warning(f"No data found for metric: {metric_name}")
+            return "No data available"
+        
+        # Create the figure
+        plt.figure(figsize=(12, 8))
+        
+        # Create a bar plot with error bars
+        ax = sns.barplot(
+            data=df,
+            x='model_name',
+            y='avg_score',
+            hue='model_name',  # Add hue parameter to avoid deprecation warning
+            legend=False       # Hide the legend since it's redundant
+        )
+        
+        # Add labels and title
+        formatted_metric = ' '.join(word.capitalize() for word in metric_name.split('_'))
+        plt.title(f'Average {formatted_metric} Score by Model', fontsize=16)
+        plt.xlabel('Model', fontsize=14)
+        plt.ylabel(f'Average {formatted_metric}', fontsize=14)
+        
+        # Add data labels on top of bars
+        for p in ax.patches:
+            ax.annotate(f'{p.get_height():.2f}', 
+                      (p.get_x() + p.get_width() / 2., p.get_height()),
+                      ha='center', va='bottom',
+                      fontsize=12)
+        
+        # Add the number of queries per model
+        for i, count in enumerate(df['query_count']):
+            ax.annotate(f'n={count}',
+                      (i, 0.02),
+                      ha='center', va='bottom',
+                      fontsize=10, color='gray')
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        # Save the figure
+        return self._save_figure(f"model_comparison_{metric_name}")
+    
+    def metric_comparison_chart(self, model_name: str) -> str:
+        """
+        Generate a radar chart showing all metrics for a specific model.
+        
+        Args:
+            model_name: Name of the model to analyze
+            
+        Returns:
+            Path to the saved chart image
+        """
+        # Define metrics to include
+        metrics = [
+            'factual_correctness',
+            'semantic_similarity',
+            'context_recall',
+            'faithfulness',
+            'bleu_score'
+        ]
+        
+        # Define the query to get average metrics for the model
+        metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
+        query = f"""
+        SELECT 
+            {metrics_str}
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        WHERE 
+            m.name = '{model_name}'
+        """
+        
+        # Fetch the data
+        df = self._fetch_data(query)
+        
+        if df.empty:
+            logger.warning(f"No data found for model: {model_name}")
+            return "No data available"
+        
+        # Convert any remaining Decimal values to float
+        df = df.astype(float)
+        
+        # Process the data for radar chart
+        values = df.iloc[0].values.tolist()
+        
+        # Create figure and polar axis
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
+        
+        # Number of metrics
+        N = len(metrics)
+        
+        # Angle of each axis
+        angles = [n / float(N) * 2 * np.pi for n in range(N)]
+        angles += angles[:1]  # Close the polygon
+        
+        # Format metric names for display
+        metric_labels = [' '.join(word.capitalize() for word in metric.split('_')) for metric in metrics]
+        
+        # Add values to complete the polygon
+        values += values[:1]
+        
+        # Plot the polygon
+        ax.plot(angles, values, linewidth=2, linestyle='solid', label=model_name)
+        ax.fill(angles, values, alpha=0.25)
+        
+        # Set the angle labels
+        plt.xticks(angles[:-1], metric_labels, fontsize=12)
+        
+        # Set y limits
+        plt.ylim(0, 1)
+        
+        # Add title
+        plt.title(f'Metrics Radar Chart for {model_name}', fontsize=16, y=1.1)
+        
+        # Add data points
+        for angle, value, label in zip(angles[:-1], values[:-1], metric_labels):
+            ax.annotate(f'{value:.2f}',
+                      xy=(angle, value),
+                      xytext=(angle, value + 0.1),
+                      ha='center', va='center',
+                      fontsize=10)
+        
+        # Save the figure with sanitized filename
+        safe_model_name = self._sanitize_filename(model_name)
+        return self._save_figure(f"radar_chart_{safe_model_name}")
+    
+    def metrics_heatmap(self, 
+                       model_names: List[str] = None,
+                       metrics: List[str] = None) -> str:
+        """
+        Generate a heatmap comparing multiple models across multiple metrics.
+        
+        Args:
+            model_names: List of model names to include
+            metrics: List of metrics to include
+            
+        Returns:
+            Path to the saved chart image
+        """
+        if metrics is None:
+            metrics = [
+                'factual_correctness',
+                'semantic_similarity',
+                'context_recall',
+                'faithfulness',
+                'bleu_score'
+            ]
+        
+        # Define the query
+        metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
+        query = f"""
+        SELECT 
+            m.name AS model_name,
+            {metrics_str}
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        """
+        
+        # Add filter for specific models if provided
+        if model_names and len(model_names) > 0:
+            model_filters = ", ".join([f"'{model}'" for model in model_names])
+            query += f"WHERE m.name IN ({model_filters})"
+            
+        # Group by model
+        query += """
+        GROUP BY 
+            m.name
+        ORDER BY 
+            model_name
+        """
+        
+        # Fetch the data
+        df = self._fetch_data(query)
+        
+        if df.empty:
+            logger.warning("No data found for heatmap")
+            return "No data available"
+        
+        # Set model name as index
+        df = df.set_index('model_name')
+        
+        # Ensure all data is numeric
+        df = df.astype(float)
+        
+        # Create figure
+        plt.figure(figsize=(12, 10))
+        
+        # Generate heatmap
+        ax = sns.heatmap(
+            df,
+            annot=True,
+            cmap="YlGnBu",
+            fmt=".2f",
+            linewidths=.5,
+            vmin=0,
+            vmax=1
+        )
+        
+        # Format metric names for display
+        formatted_metrics = [' '.join(word.capitalize() for word in metric.split('_')) for metric in metrics]
+        
+        # Add labels and title
+        plt.title('Model Performance Across Metrics', fontsize=16)
+        plt.xlabel('Metrics', fontsize=14)
+        plt.ylabel('Models', fontsize=14)
+        
+        # Set x-axis labels to formatted metrics
+        ax.set_xticklabels(formatted_metrics, rotation=45, ha='right')
+        
+        # Save the figure
+        return self._save_figure("metrics_heatmap")
+    
+    def query_performance_chart(self, 
+                              model_name: str,
+                              metric_name: str = 'factual_correctness',
+                              limit: int = 10) -> str:
+        """
+        Generate a bar chart showing performance on individual queries for a specific model.
+        
+        Args:
+            model_name: Name of the model to analyze
+            metric_name: Name of the metric to visualize
+            limit: Maximum number of queries to include
+            
+        Returns:
+            Path to the saved chart image
+        """
+        # Define the query
+        query = f"""
+        SELECT 
+            qr.query,
+            em.{metric_name} AS score
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        WHERE 
+            m.name = '{model_name}'
+        ORDER BY 
+            qr."timestamp" DESC
+        LIMIT {limit}
+        """
+        
+        # Fetch the data
+        df = self._fetch_data(query)
+        
+        if df.empty:
+            logger.warning(f"No data found for model: {model_name}")
+            return "No data available"
+        
+        # Ensure score is numeric
+        df['score'] = pd.to_numeric(df['score'], errors='coerce')
+        
+        # Truncate long queries
+        df['short_query'] = df['query'].apply(lambda x: (x[:50] + '...') if len(x) > 50 else x)
+        
+        # Create figure
+        plt.figure(figsize=(14, 8))
+        
+        # Create horizontal bar chart
+        ax = sns.barplot(
+            data=df,
+            y='short_query',
+            x='score',
+            orient='h'
+        )
+        
+        # Format metric name for display
+        formatted_metric = ' '.join(word.capitalize() for word in metric_name.split('_'))
+        
+        # Add labels and title
+        plt.title(f'{formatted_metric} Scores by Query for {model_name}', fontsize=16)
+        plt.xlabel(f'{formatted_metric} Score', fontsize=14)
+        plt.ylabel('Query', fontsize=14)
+        
+        # Add data labels
+        for p in ax.patches:
+            ax.annotate(f'{p.get_width():.2f}', 
+                      (p.get_width(), p.get_y() + p.get_height() / 2),
+                      ha='left', va='center',
+                      fontsize=10, xytext=(5, 0),
+                      textcoords='offset points')
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        # Save the figure with sanitized filename
+        safe_model_name = self._sanitize_filename(model_name)
+        return self._save_figure(f"query_performance_{safe_model_name}_{metric_name}")
+    
+    def model_vs_model_chart(self,
+                           model1: str,
+                           model2: str,
+                           metrics: List[str] = None) -> str:
+        """
+        Generate a side-by-side bar chart comparing two models across multiple metrics.
+        
+        Args:
+            model1: Name of the first model
+            model2: Name of the second model
+            metrics: List of metrics to include
+            
+        Returns:
+            Path to the saved chart image
+        """
+        if metrics is None:
+            metrics = [
+                'factual_correctness',
+                'semantic_similarity',
+                'context_recall',
+                'faithfulness',
+                'bleu_score'
+            ]
+        
+        # Define the query
+        metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
+        query = f"""
+        SELECT 
+            m.name AS model_name,
+            {metrics_str}
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        WHERE 
+            m.name IN ('{model1}', '{model2}')
+        GROUP BY 
+            m.name
+        """
+        
+        # Fetch the data
+        df = self._fetch_data(query)
+        
+        if df.empty:
+            logger.warning(f"No data found for models: {model1} and {model2}")
+            return "No data available"
+        
+        # Ensure all data is numeric
+        for col in metrics:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Reshape data for grouped bar chart
+        df_melted = pd.melt(
+            df, 
+            id_vars=['model_name'],
+            value_vars=metrics,
+            var_name='Metric',
+            value_name='Score'
+        )
+        
+        # Format metric names for display
+        df_melted['Metric'] = df_melted['Metric'].apply(
+            lambda x: ' '.join(word.capitalize() for word in x.split('_'))
+        )
+        
+        # Create figure
+        plt.figure(figsize=(14, 8))
+        
+        # Create grouped bar chart
+        ax = sns.barplot(
+            data=df_melted,
+            x='Metric',
+            y='Score',
+            hue='model_name',
+            palette=['#1f77b4', '#ff7f0e']
+        )
+        
+        # Add labels and title
+        plt.title(f'Model Comparison: {model1} vs {model2}', fontsize=16)
+        plt.xlabel('Metric', fontsize=14)
+        plt.ylabel('Score', fontsize=14)
+        
+        # Add data labels
+        for p in ax.patches:
+            ax.annotate(f'{p.get_height():.2f}', 
+                      (p.get_x() + p.get_width() / 2., p.get_height()),
+                      ha='center', va='bottom',
+                      fontsize=10)
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        # Save the figure with sanitized filename
+        safe_model1 = self._sanitize_filename(model1)
+        safe_model2 = self._sanitize_filename(model2)
+        return self._save_figure(f"model_comparison_{safe_model1}_vs_{safe_model2}")
+
+    def all_models_all_metrics(self) -> str:
+        """
+        Generate a comprehensive grouped bar chart showing all models and all metrics.
+        
+        Returns:
+            Path to the saved chart image
+        """
+        # Define metrics to include
+        metrics = [
+            'factual_correctness',
+            'semantic_similarity',
+            'context_recall',
+            'faithfulness',
+            'bleu_score'
+        ]
+        
+        # Define the query
+        metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
+        query = f"""
+        SELECT 
+            m.name AS model_name,
+            {metrics_str},
+            COUNT(*) AS query_count
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        GROUP BY 
+            m.name
+        ORDER BY 
+            AVG(em.factual_correctness) DESC
+        """
+        
+        # Fetch the data
+        df = self._fetch_data(query)
+        
+        if df.empty:
+            logger.warning("No data found")
+            return "No data available"
+        
+        # Ensure all data is numeric
+        for col in metrics:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Reshape data for grouped bar chart
+        df_melted = pd.melt(
+            df, 
+            id_vars=['model_name', 'query_count'],
+            value_vars=metrics,
+            var_name='Metric',
+            value_name='Score'
+        )
+        
+        # Format metric names for display
+        df_melted['Metric'] = df_melted['Metric'].apply(
+            lambda x: ' '.join(word.capitalize() for word in x.split('_'))
+        )
+        
+        # Create figure
+        plt.figure(figsize=(16, 10))
+        
+        # Create grouped bar chart
+        ax = sns.barplot(
+            data=df_melted,
+            x='model_name',
+            y='Score',
+            hue='Metric',
+            palette='viridis'
+        )
+        
+        # Add labels and title
+        plt.title('Comprehensive Model Performance Across All Metrics', fontsize=16)
+        plt.xlabel('Model', fontsize=14)
+        plt.ylabel('Score', fontsize=14)
+        
+        # Rotate x-axis labels for better readability
+        plt.xticks(rotation=45, ha='right')
+        
+        # Add the number of queries per model
+        model_positions = {model: i for i, model in enumerate(df['model_name'].unique())}
+        for model, count in zip(df['model_name'].unique(), df['query_count'].unique()):
+            ax.annotate(f'n={count}',
+                      (model_positions[model], 0.02),
+                      ha='center', va='bottom',
+                      fontsize=8, color='gray')
+        
+        # Add legend outside the plot
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        # Save the figure
+        return self._save_figure("all_models_all_metrics")
+        
+    def ragas_radar_chart(self) -> str:
+        """
+        Generate an optimized radar chart showing all models and all RAGAS metrics.
+        The chart will display average scores for each model across all RAGAS evaluation metrics.
+        
+        Returns:
+            Path to the saved chart image
+        """
+        # Include all RAGAS metrics from the table
+        metrics = [
+            'factual_correctness',   # Measures the factual accuracy
+            'semantic_similarity',    # Measures semantic similarity to reference
+            'context_recall',        # Measures how well context is utilized
+            'faithfulness',          # Measures answer's faithfulness to the context
+            'bleu_score',            # BLEU Score for lexical similarity
+            'string_similarity',      # String similarity measure
+            'rogue_score',           # ROUGE Score for summary evaluation
+            'string_present'         # Presence of specific strings
+        ]
+        
+        # Define the query with error handling for missing columns
+        base_metrics = []
+        for metric in metrics:
+            base_metrics.append(f"AVG(CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'evaluation_metrics' AND column_name = '{metric}') THEN em.{metric} ELSE NULL END) AS {metric}")
+        
+        metrics_str = ', '.join(base_metrics)
+        
+        query = f"""
+        SELECT 
+            m.name AS model_name,
+            {metrics_str},
+            COUNT(*) AS query_count
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        GROUP BY 
+            m.name
+        ORDER BY 
+            AVG(em.factual_correctness) DESC
+        """
+        
+        # Fetch the data
+        try:
+            df = self._fetch_data(query)
+        except Exception as e:
+            logger.error(f"Error with full metrics query: {e}")
+            # Fallback to query only existing columns
+            logger.info("Falling back to query for existing columns only")
+            
+            # Get available metrics from the database
+            schema_query = """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'evaluation_metrics'
+            """
+            
+            available_columns = self._fetch_data(schema_query)
+            available_metrics = [col[0] for col in available_columns.values]
+            
+            # Filter metrics to only include those that exist
+            valid_metrics = [m for m in metrics if m in available_metrics]
+            
+            if not valid_metrics:
+                logger.error("No valid metrics found in database")
+                return "No valid metrics available"
+                
+            # Build new query with only valid metrics
+            metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in valid_metrics])
+            query = f"""
+            SELECT 
+                m.name AS model_name,
+                {metrics_str},
+                COUNT(*) AS query_count
+            FROM 
+                query_result qr
+                JOIN llm_models m ON qr.llm_model_id = m.id
+                JOIN query_evaluation qe ON qr.id = qe.query_result_id
+                JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+            GROUP BY 
+                m.name
+            ORDER BY 
+                AVG(em.factual_correctness) DESC
+            """
+            
+            df = self._fetch_data(query)
+            
+            # Update metrics list to what's actually available
+            metrics = valid_metrics
+        
+        if df.empty:
+            logger.warning("No data found for RAGAS radar chart")
+            return "No data available"
+        
+        # Filter out columns that don't exist in the dataframe
+        metrics = [m for m in metrics if m in df.columns]
+        
+        # Convert to numeric and handle NaN values
+        for col in metrics:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # Format metric names for display
+        metric_labels = [' '.join(word.capitalize() for word in metric.split('_')) for metric in metrics]
+        
+        # Create figure with white background and more space for the legend
+        fig = plt.figure(figsize=(16, 16), facecolor='white')
+        
+        # Create a gridspec for the radar plot and legend
+        gs = fig.add_gridspec(2, 1, height_ratios=[1, 5])
+        
+        # Add a title at the top of the figure
+        ax_title = fig.add_subplot(gs[0])
+        ax_title.axis('off')  # Hide axis
+        ax_title.text(0.5, 0.5, 'Complete RAGAS Metrics Comparison', 
+                     fontsize=24, fontweight='bold', ha='center', va='center')
+        
+        # Create radar plot
+        ax = fig.add_subplot(gs[1], polar=True)
+        
+        # Set background color
+        ax.set_facecolor('white')
+        
+        # Number of metrics (axes)
+        N = len(metrics)
+        
+        # Calculate angles for each axis
+        angles = [n / float(N) * 2 * np.pi for n in range(N)]
+        angles += angles[:1]  # Close the polygon
+        
+        # Set the labels for each axis with increased font size
+        plt.xticks(angles[:-1], metric_labels, fontsize=16, fontweight='bold')
+        
+        # Draw y-axis labels (grid lines) with better visibility
+        plt.yticks([0.2, 0.4, 0.6, 0.8, 1.0], ['0.2', '0.4', '0.6', '0.8', '1.0'], 
+                   color="black", size=14)
+        plt.ylim(0, 1)
+        
+        # Remove the concentric circles for a cleaner look
+        ax.grid(False)  # Turn off the default grid
+        
+        # Add black axis lines from center to each vertex 
+        for angle in angles[:-1]:
+            ax.plot([0, angle], [0, 1], 'black', linewidth=0.8, alpha=0.5)
+            
+        # Add concentric circles to create a spider web effect
+        for r in [0.2, 0.4, 0.6, 0.8]:
+            # Calculate points on the circle
+            circle_angles = np.linspace(0, 2*np.pi, 100)
+            x = r * np.cos(circle_angles)
+            y = r * np.sin(circle_angles)
+            
+            # Draw the circle as a line
+            ax.plot(circle_angles, [r] * len(circle_angles), color='black', linestyle='-', linewidth=0.6, alpha=0.3)
+        
+        # Define a custom, darker color palette - similar to the second image
+        custom_colors = [
+            '#1f77b4',  # Blue (nova-pro-v1)
+            '#ff7f0e',  # Orange (claude-3.7-sonnet) 
+            '#2ca02c',  # Green (gemini-2.5-flash-preview)
+            '#d62728',  # Red (llama-3.1-8b-instruct)
+            '#9467bd',  # Purple (llama-3.3-70b-instruct)
+            '#8c564b',  # Brown (mistral-8b)
+            '#e377c2',  # Pink (gpt-4o-2024-11-20)
+            '#7f7f7f',  # Gray (qwen-2.5-72b-instruct)
+            '#bcbd22',  # Olive
+            '#17becf',  # Teal
+        ]
+        
+        # Create a color mapping dictionary to ensure consistent colors
+        model_color_map = {}
+        for i, model_name in enumerate(df['model_name']):
+            color_idx = i % len(custom_colors)
+            model_color_map[model_name] = custom_colors[color_idx]
+        
+        # Plot each model with enhanced visibility
+        for i, (idx, row) in enumerate(df.iterrows()):
+            model_name = row['model_name']
+            color = model_color_map[model_name]
+            
+            # Get values for each metric, handling missing metrics
+            values = [row[metric] if metric in row.index and pd.notna(row[metric]) else 0 for metric in metrics]
+            values += values[:1]  # Close the polygon
+            
+            # Plot the model's polygon with higher line width for better visibility
+            ax.plot(angles, values, linewidth=3.5, linestyle='solid', 
+                   label=model_name, color=color)
+            
+            # Fill with semi-transparent color
+            ax.fill(angles, values, alpha=0.25, color=color)
+            
+            # Add data points at each vertex with bigger markers
+            for j, value in enumerate(values[:-1]):
+                ax.scatter(angles[j], value, s=120, color=color, 
+                          edgecolor='black', linewidth=1.5, zorder=10)
+                
+                # Add value labels at each point for better readability
+                if value > 0.05:  # Only show values that are significant
+                    ha = 'left' if angles[j] > np.pi else 'right'
+                    va = 'bottom' if angles[j] < np.pi/2 or angles[j] > 3*np.pi/2 else 'top'
+                    
+                    # Position adjustment for better label placement
+                    offset = 0.05
+                    x_offset = np.cos(angles[j]) * offset
+                    y_offset = np.sin(angles[j]) * offset
+                    
+                    # Add text with background for better visibility
+                    ax.text(angles[j] + x_offset, value + y_offset, f'{value:.2f}', 
+                           fontsize=10, fontweight='bold', ha=ha, va=va,
+                           bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
+        
+        # Create legend similar to the second image - horizontal colored boxes above the chart
+        handles = []
+        legend_labels = []
+        
+        for model_name in df['model_name']:
+            count = int(df.loc[df['model_name'] == model_name, 'query_count'].iloc[0])
+            color = model_color_map[model_name]
+            # Create a rectangle patch for each model
+            handle = plt.Rectangle((0, 0), 1, 1, color=color)
+            handles.append(handle)
+            legend_labels.append(f"{model_name} (n={count})")
+        
+        # Create legend without adding it to the plot yet
+        legend = ax_title.legend(handles, legend_labels, loc='upper center', 
+                               ncol=min(4, len(df)), fontsize=12, frameon=True,
+                               bbox_to_anchor=(0.5, 0.2))
+        
+        # Adjust layout for better readability
+        plt.tight_layout()
+        
+        # Save the figure with higher DPI for better quality
+        return self._save_figure("enhanced_ragas_metrics_radar_chart", dpi=300) 

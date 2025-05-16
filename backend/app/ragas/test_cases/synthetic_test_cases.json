@@ -1,12 +1,32 @@
 [
   {
-    "test_no": 20,
-    "query": "What is the total CO2 emission from Ljusteröleden in February 2024, assuming 2.68 kg CO2 per liter of fuel?",
+    "test_no": 1,
+    "query": "What is the total fuel cost for ferry Jupiter in January 2024 assuming that the price per liter is 20 sek?",
     "reference_contexts": [
-        "CO2 Emissions Analysis for Ljusteröleden in February 2024:\nTotal fuel consumption: 16,359.66 liters\nCO2 emission factor: 2.68 kg CO2 per liter\nTotal CO2 emissions: 43,843.88 kg CO2 (43.84 tons CO2)"
+      "Total fuel consumption for ferry Jupiter in January 2024: 12709.34 liters. Total fuel cost for ferry Jupiter in January 2024: 254186.70 SEK"
     ],
-    "ground_truth": "The total CO2 emission from Ljusteröleden in February 2024 is 43,843.88 kg",
-    "extracted_true_value": "43843.88",
+    "ground_truth": "Total fuel cost for ferry Jupiter in January 2024: 254186.70 SEK",
+    "extracted_true_value": "254186.70",
+    "synthesizer_name": "single_hop_specifc_query_synthesizer"
+  },
+  {
+    "test_no": 2,
+    "query": "What is the average speed of ferry Jupiter? (in km/h)",
+    "reference_contexts": [
+      "The average speed of ferry Jupiter is: 6.23 knots. Average speed in km/h: 11.55 km/h."
+    ],
+    "ground_truth": "Average speed in km/h is 11.55 km/h",
+    "extracted_true_value": "11.55",
+    "synthesizer_name": "single_hop_specifc_query_synthesizer"
+  },
+  {
+    "test_no": 3,
+    "query": "How many vehicles are on average left at the terminal for inbound trips?",
+    "reference_contexts": [
+      "Analysis of Vehicles Left at Terminal for Inbound Trips: Average vehicles left at terminal per inbound trip: 0.3270"
+    ],
+    "ground_truth": " On average, 0.3270 vehicles are left at the terminal for inbound trips.",
+    "extracted_true_value": "0.3270",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   }
 ]

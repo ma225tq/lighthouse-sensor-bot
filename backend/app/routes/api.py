@@ -202,3 +202,195 @@ def get_test_cases():
     except Exception as e:
         logger.error(f"Error fetching test cases: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/charts/model-comparison", methods=["GET"])
+def chart_model_comparison():
+    """Generate a bar chart comparing different models on a specific metric."""
+    try:
+        from app.utils.chart_generator import ChartGenerator
+        
+        metric_name = request.args.get("metric", "factual_correctness")
+        
+        # Get optional model names as a comma-separated list
+        model_names_param = request.args.get("models")
+        model_names = model_names_param.split(",") if model_names_param else None
+        
+        # Create chart
+        chart_generator = ChartGenerator()
+        chart_path = chart_generator.model_comparison_chart(
+            metric_name=metric_name,
+            model_names=model_names
+        )
+        
+        return_dir = "/".join(chart_path.split("/")[-3:])  # Get relative path for response
+        
+        return jsonify({
+            "status": "success",
+            "chart_path": return_dir,
+            "metric": metric_name,
+            "models": model_names
+        })
+    
+    except Exception as e:
+        logger.error(f"Error generating model comparison chart: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/charts/model-metrics", methods=["GET"])
+def chart_model_metrics():
+    """Generate a radar chart showing all metrics for a specific model."""
+    try:
+        from app.utils.chart_generator import ChartGenerator
+        
+        model_name = request.args.get("model")
+        if not model_name:
+            return jsonify({"error": "Model name is required"}), 400
+        
+        # Create chart
+        chart_generator = ChartGenerator()
+        chart_path = chart_generator.metric_comparison_chart(model_name=model_name)
+        
+        return_dir = "/".join(chart_path.split("/")[-3:])  # Get relative path for response
+        
+        return jsonify({
+            "status": "success",
+            "chart_path": return_dir,
+            "model": model_name
+        })
+    
+    except Exception as e:
+        logger.error(f"Error generating model metrics chart: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/charts/metrics-heatmap", methods=["GET"])
+def chart_metrics_heatmap():
+    """Generate a heatmap comparing multiple models across multiple metrics."""
+    try:
+        from app.utils.chart_generator import ChartGenerator
+        
+        # Get optional model names as a comma-separated list
+        model_names_param = request.args.get("models")
+        model_names = model_names_param.split(",") if model_names_param else None
+        
+        # Get optional metrics as a comma-separated list
+        metrics_param = request.args.get("metrics")
+        metrics = metrics_param.split(",") if metrics_param else None
+        
+        # Create chart
+        chart_generator = ChartGenerator()
+        chart_path = chart_generator.metrics_heatmap(
+            model_names=model_names,
+            metrics=metrics
+        )
+        
+        return_dir = "/".join(chart_path.split("/")[-3:])  # Get relative path for response
+        
+        return jsonify({
+            "status": "success",
+            "chart_path": return_dir,
+            "models": model_names,
+            "metrics": metrics
+        })
+    
+    except Exception as e:
+        logger.error(f"Error generating metrics heatmap: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/charts/query-performance", methods=["GET"])
+def chart_query_performance():
+    """Generate a bar chart showing performance on individual queries for a specific model."""
+    try:
+        from app.utils.chart_generator import ChartGenerator
+        
+        model_name = request.args.get("model")
+        if not model_name:
+            return jsonify({"error": "Model name is required"}), 400
+        
+        metric_name = request.args.get("metric", "factual_correctness")
+        limit = int(request.args.get("limit", 10))
+        
+        # Create chart
+        chart_generator = ChartGenerator()
+        chart_path = chart_generator.query_performance_chart(
+            model_name=model_name,
+            metric_name=metric_name,
+            limit=limit
+        )
+        
+        return_dir = "/".join(chart_path.split("/")[-3:])  # Get relative path for response
+        
+        return jsonify({
+            "status": "success",
+            "chart_path": return_dir,
+            "model": model_name,
+            "metric": metric_name,
+            "limit": limit
+        })
+    
+    except Exception as e:
+        logger.error(f"Error generating query performance chart: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/charts/model-vs-model", methods=["GET"])
+def chart_model_vs_model():
+    """Generate a side-by-side bar chart comparing two models across multiple metrics."""
+    try:
+        from app.utils.chart_generator import ChartGenerator
+        
+        model1 = request.args.get("model1")
+        model2 = request.args.get("model2")
+        
+        if not model1 or not model2:
+            return jsonify({"error": "Both model1 and model2 parameters are required"}), 400
+        
+        # Get optional metrics as a comma-separated list
+        metrics_param = request.args.get("metrics")
+        metrics = metrics_param.split(",") if metrics_param else None
+        
+        # Create chart
+        chart_generator = ChartGenerator()
+        chart_path = chart_generator.model_vs_model_chart(
+            model1=model1,
+            model2=model2,
+            metrics=metrics
+        )
+        
+        return_dir = "/".join(chart_path.split("/")[-3:])  # Get relative path for response
+        
+        return jsonify({
+            "status": "success",
+            "chart_path": return_dir,
+            "model1": model1,
+            "model2": model2,
+            "metrics": metrics
+        })
+    
+    except Exception as e:
+        logger.error(f"Error generating model vs model chart: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/charts/all-models-all-metrics", methods=["GET"])
+def chart_all_models_all_metrics():
+    """Generate a comprehensive grouped bar chart showing all models and all metrics."""
+    try:
+        from app.utils.chart_generator import ChartGenerator
+        
+        # Create chart
+        chart_generator = ChartGenerator()
+        chart_path = chart_generator.all_models_all_metrics()
+        
+        return_dir = "/".join(chart_path.split("/")[-3:])  # Get relative path for response
+        
+        return jsonify({
+            "status": "success",
+            "chart_path": return_dir
+        })
+    
+    except Exception as e:
+        logger.error(f"Error generating all models all metrics chart: {e}")
+        return jsonify({"error": str(e)}), 500
