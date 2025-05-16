@@ -51,7 +51,6 @@ def main():
     print(f"Chart saved: {chart_path}")
 
     # Example 3: Generate radar chart for a specific model
-    # Note: Replace this with an actual model name from your database
     model_name = "qwen/qwen-2.5-72b-instruct"  
     print(f"\n3. Model Metrics Radar Chart for {model_name}")
     try:

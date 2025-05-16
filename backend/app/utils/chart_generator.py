@@ -681,8 +681,36 @@ class ChartGenerator:
                 'semantic_similarity',
                 'context_recall',
                 'faithfulness',
-                'bleu_score'
+                'bleu_score',
+                'rogue_score',
+                'non_llm_string_similarity',
+                'string_present'
             ]
+        
+        # Get available columns from the database to ensure we only query existing metrics
+        try:
+            schema_query = """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'evaluation_metrics'
+            """
+            
+            available_columns = self._fetch_data(schema_query)
+            available_metrics = [col[0] for col in available_columns.values]
+            
+            # Filter metrics to only include those that exist
+            valid_metrics = [m for m in metrics if m in available_metrics]
+            
+            if not valid_metrics:
+                logger.error("No valid metrics found in database")
+                return "No valid metrics available"
+                
+            # Update metrics list to what's actually available
+            metrics = valid_metrics
+            
+        except Exception as e:
+            logger.error(f"Error querying schema: {e}")
+            # Continue with the provided metrics list
         
         # Define the query
         metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
@@ -710,7 +738,8 @@ class ChartGenerator:
         
         # Ensure all data is numeric
         for col in metrics:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         # Reshape data for grouped bar chart
         df_melted = pd.melt(
@@ -727,28 +756,39 @@ class ChartGenerator:
         )
         
         # Create figure
-        plt.figure(figsize=(14, 8))
+        plt.figure(figsize=(14, 8), facecolor='white')
         
-        # Create grouped bar chart
+        # Create grouped bar chart with improved colors
+        colors = ['#1f77b4', '#ff7f0e']  # Blue and orange for better contrast
+        
         ax = sns.barplot(
             data=df_melted,
             x='Metric',
             y='Score',
             hue='model_name',
-            palette=['#1f77b4', '#ff7f0e']
+            palette=colors
         )
         
         # Add labels and title
-        plt.title(f'Model Comparison: {model1} vs {model2}', fontsize=16)
+        plt.title(f'Model Comparison: {model1} vs {model2}', fontsize=16, fontweight='bold')
         plt.xlabel('Metric', fontsize=14)
         plt.ylabel('Score', fontsize=14)
         
-        # Add data labels
+        # Add grid for better readability
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        
+        # Ensure y-axis starts at 0 and ends at 1.0 for better comparison
+        plt.ylim(0, 1.0)
+        
+        # Add data labels with values
         for p in ax.patches:
             ax.annotate(f'{p.get_height():.2f}', 
                       (p.get_x() + p.get_width() / 2., p.get_height()),
                       ha='center', va='bottom',
-                      fontsize=10)
+                      fontsize=10, fontweight='bold')
+        
+        # Improve legend with custom title
+        plt.legend(title='Model Name', loc='upper right')
         
         # Adjust layout
         plt.tight_layout()
@@ -756,7 +796,7 @@ class ChartGenerator:
         # Save the figure with sanitized filename
         safe_model1 = self._sanitize_filename(model1)
         safe_model2 = self._sanitize_filename(model2)
-        return self._save_figure(f"model_comparison_{safe_model1}_vs_{safe_model2}")
+        return self._save_figure(f"model_comparison_{safe_model1}_vs_{safe_model2}", dpi=300)
 
     def all_models_all_metrics(self) -> str:
         """
@@ -765,6 +805,21 @@ class ChartGenerator:
         Returns:
             Path to the saved chart image
         """
+        # First, let's query the database to get all available model names
+        model_query = """
+        SELECT DISTINCT m.name 
+        FROM llm_models m
+        JOIN query_result qr ON qr.llm_model_id = m.id
+        """
+        
+        try:
+            model_df = self._fetch_data(model_query)
+            print("\nAvailable model names in database:")
+            for model in model_df['name']:
+                print(f"  - \"{model}\"")
+        except Exception as e:
+            print(f"Error querying model names: {e}")
+        
         # Define all RAGAS metrics to include - same as radar chart
         metrics = [
             'factual_correctness',
