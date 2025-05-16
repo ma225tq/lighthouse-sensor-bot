@@ -243,44 +243,84 @@ class ChartGenerator:
         Returns:
             Path to the saved chart image
         """
-        # Define metrics to include
+        # Define metrics to include - use the same approach as ragas_radar_chart
         metrics = [
             'factual_correctness',
             'semantic_similarity',
             'context_recall',
             'faithfulness',
-            'bleu_score'
+            'bleu_score',
+            'rogue_score',
+            'string_present'
         ]
         
-        # Define the query to get average metrics for the model
-        metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
-        query = f"""
-        SELECT 
-            {metrics_str}
-        FROM 
-            query_result qr
-            JOIN llm_models m ON qr.llm_model_id = m.id
-            JOIN query_evaluation qe ON qr.id = qe.query_result_id
-            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
-        WHERE 
-            m.name = '{model_name}'
-        """
-        
-        # Fetch the data
-        df = self._fetch_data(query)
-        
-        if df.empty:
-            logger.warning(f"No data found for model: {model_name}")
-            return "No data available"
-        
-        # Convert any remaining Decimal values to float
-        df = df.astype(float)
-        
-        # Process the data for radar chart
-        values = df.iloc[0].values.tolist()
+        # Define the query with flexible column handling as in ragas_radar_chart
+        try:
+            # First try to get available columns from the database
+            schema_query = """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'evaluation_metrics'
+            """
+            
+            available_columns = self._fetch_data(schema_query)
+            available_metrics = [col[0] for col in available_columns.values]
+            
+            # Filter metrics to only include those that exist
+            valid_metrics = [m for m in metrics if m in available_metrics]
+            
+            if not valid_metrics:
+                logger.error("No valid metrics found in database")
+                raise ValueError("No valid metrics available")
+                
+            # Build query with only valid metrics
+            metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in valid_metrics])
+            query = f"""
+            SELECT 
+                {metrics_str},
+                COUNT(*) AS query_count
+            FROM 
+                query_result qr
+                JOIN llm_models m ON qr.llm_model_id = m.id
+                JOIN query_evaluation qe ON qr.id = qe.query_result_id
+                JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+            WHERE 
+                m.name = '{model_name}'
+            """
+            
+            # Fetch the data
+            df = self._fetch_data(query)
+            
+            # Update metrics list to what's actually available
+            metrics = valid_metrics
+            
+        except Exception as e:
+            logger.error(f"Error querying data for {model_name}: {e}")
+            
+            # Fallback to basic query with minimal metrics
+            basic_metrics = ['factual_correctness', 'semantic_similarity']
+            metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in basic_metrics])
+            query = f"""
+            SELECT 
+                {metrics_str},
+                COUNT(*) AS query_count
+            FROM 
+                query_result qr
+                JOIN llm_models m ON qr.llm_model_id = m.id
+                JOIN query_evaluation qe ON qr.id = qe.query_result_id
+                JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+            WHERE 
+                m.name = '{model_name}'
+            """
+            
+            # Fetch the data
+            df = self._fetch_data(query)
+            metrics = basic_metrics
         
         # Create figure and polar axis
-        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
+        fig = plt.figure(figsize=(12, 12), facecolor='white')
+        ax = plt.subplot(111, polar=True)
+        ax.set_facecolor('white')
         
         # Number of metrics
         N = len(metrics)
@@ -292,33 +332,100 @@ class ChartGenerator:
         # Format metric names for display
         metric_labels = [' '.join(word.capitalize() for word in metric.split('_')) for metric in metrics]
         
-        # Add values to complete the polygon
-        values += values[:1]
+        # Turn off the default grid
+        ax.grid(False)
         
-        # Plot the polygon
-        ax.plot(angles, values, linewidth=2, linestyle='solid', label=model_name)
-        ax.fill(angles, values, alpha=0.25)
-        
+        # Add black axis lines from center to each vertex
+        for angle in angles[:-1]:
+            ax.plot([0, angle], [0, 1], 'black', linewidth=0.8, alpha=0.5)
+            
+        # Add concentric circles to create a spider web effect
+        for r in [0.2, 0.4, 0.6, 0.8]:
+            # Calculate points on the circle
+            circle_angles = np.linspace(0, 2*np.pi, 100)
+            # Draw the circle as a line
+            ax.plot(circle_angles, [r] * len(circle_angles), color='black', linestyle='-', linewidth=0.6, alpha=0.3)
+            
         # Set the angle labels
-        plt.xticks(angles[:-1], metric_labels, fontsize=12)
+        plt.xticks(angles[:-1], metric_labels, fontsize=14, fontweight='bold')
         
         # Set y limits
         plt.ylim(0, 1)
+        plt.yticks([0.2, 0.4, 0.6, 0.8, 1.0], ['0.2', '0.4', '0.6', '0.8', '1.0'], 
+                 color="black", size=12)
+        
+        # Check if we have valid data
+        if df.empty or df['query_count'].iloc[0] == 0:
+            # Add a message in the center of the chart
+            ax.text(0, 0, f"No data available for\n{model_name}", 
+                   fontsize=18, fontweight='bold', ha='center', va='center',
+                   bbox=dict(facecolor='white', alpha=0.8, edgecolor='red', boxstyle='round,pad=0.5'))
+            
+            # Add title indicating no data
+            plt.title(f'Metrics Radar Chart for {model_name} (No Data)', fontsize=18, fontweight='bold', y=1.05)
+            
+            # Log a warning
+            logger.warning(f"No data found for model: {model_name}")
+            
+            # Save the figure with sanitized filename
+            safe_model_name = self._sanitize_filename(model_name)
+            return self._save_figure(f"radar_chart_{safe_model_name}_no_data", dpi=300)
+        
+        # Get the query count
+        query_count = int(df['query_count'].iloc[0])
+        
+        # Convert any remaining Decimal values to float
+        for col in df.columns:
+            if col != 'query_count' and col in metrics:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # Process the data for radar chart - handle any missing columns
+        values = [df.iloc[0][metric] if metric in df.columns else 0 for metric in metrics]
+        
+        # Add values to complete the polygon
+        values += values[:1]
+        
+        # Choose a vibrant color for the model - match the multi-model chart color for consistency
+        model_color = '#1f77b4'  # Blue for nova-pro-v1
+        if model_name.lower().startswith('claude'):
+            model_color = '#ff7f0e'  # Orange for Claude models
+        elif model_name.lower().startswith('gpt') or model_name.lower().startswith('openai'):
+            model_color = '#e377c2'  # Pink for GPT/OpenAI models
+        elif model_name.lower().startswith('gemini'):
+            model_color = '#2ca02c'  # Green for Gemini models
+        elif model_name.lower().startswith('llama'):
+            model_color = '#d62728'  # Red for Llama models
+        
+        # Plot the polygon with higher line width
+        ax.plot(angles, values, linewidth=3, linestyle='solid', color=model_color)
+        ax.fill(angles, values, alpha=0.25, color=model_color)
+        
+        # Add data points at each vertex with bigger markers
+        for i, value in enumerate(values[:-1]):
+            ax.scatter(angles[i], value, s=120, color=model_color, 
+                     edgecolor='black', linewidth=1.5, zorder=10)
+            
+            # Add value labels at each point
+            ha = 'left' if angles[i] > np.pi else 'right'
+            va = 'bottom' if angles[i] < np.pi/2 or angles[i] > 3*np.pi/2 else 'top'
+            offset = 0.05
+            x_offset = np.cos(angles[i]) * offset
+            y_offset = np.sin(angles[i]) * offset
+            
+            # Add text with background for better visibility
+            ax.text(angles[i] + x_offset, value + y_offset, f'{value:.2f}', 
+                   fontsize=12, fontweight='bold', ha=ha, va=va,
+                   bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
         
         # Add title
-        plt.title(f'Metrics Radar Chart for {model_name}', fontsize=16, y=1.1)
+        plt.title(f'Metrics Radar Chart for {model_name} (n={query_count})', fontsize=18, fontweight='bold', y=1.05)
         
-        # Add data points
-        for angle, value, label in zip(angles[:-1], values[:-1], metric_labels):
-            ax.annotate(f'{value:.2f}',
-                      xy=(angle, value),
-                      xytext=(angle, value + 0.1),
-                      ha='center', va='center',
-                      fontsize=10)
+        # Adjust layout
+        plt.tight_layout()
         
         # Save the figure with sanitized filename
         safe_model_name = self._sanitize_filename(model_name)
-        return self._save_figure(f"radar_chart_{safe_model_name}")
+        return self._save_figure(f"radar_chart_{safe_model_name}", dpi=300)
     
     def metrics_heatmap(self, 
                        model_names: List[str] = None,
@@ -334,13 +441,50 @@ class ChartGenerator:
             Path to the saved chart image
         """
         if metrics is None:
+            # Include all RAGAS metrics by default
             metrics = [
                 'factual_correctness',
-                'semantic_similarity',
+                'semantic_similarity', 
                 'context_recall',
                 'faithfulness',
-                'bleu_score'
+                'bleu_score',
+                'rogue_score',
+                'non_llm_string_similarity',  # Using exact database column name
+                'string_present'
             ]
+        
+        # Try to get available columns from the database
+        try:
+            schema_query = """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'evaluation_metrics'
+            """
+            
+            available_columns = self._fetch_data(schema_query)
+            available_metrics = [col[0] for col in available_columns.values]
+            
+            # Check for string similarity-related columns with flexible matching
+            string_sim_variants = ['string_similarity', 'stringsimilarity', 'str_similarity', 'similarity_string']
+            string_sim_cols = [col for col in available_metrics if any(variant in col.lower() for variant in string_sim_variants)]
+            
+            if string_sim_cols:
+                # Replace our standard name with the actual column name from database
+                metrics = [string_sim_cols[0] if m == 'string_similarity' else m for m in metrics]
+            
+            # Filter metrics to only include those that exist
+            valid_metrics = [m for m in metrics if m in available_metrics]
+            
+            if not valid_metrics:
+                logger.error("No valid metrics found in database")
+                valid_metrics = ['factual_correctness']
+                
+            # Update metrics list to what's actually available
+            metrics = valid_metrics
+            
+        except Exception as e:
+            logger.error(f"Error querying schema for heatmap: {e}")
+            # Continue with the provided metrics
         
         # Define the query
         metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
@@ -381,10 +525,10 @@ class ChartGenerator:
         # Ensure all data is numeric
         df = df.astype(float)
         
-        # Create figure
-        plt.figure(figsize=(12, 10))
+        # Create figure with white background for better visibility
+        plt.figure(figsize=(14, 10), facecolor='white')
         
-        # Generate heatmap
+        # Generate heatmap with improved styling
         ax = sns.heatmap(
             df,
             annot=True,
@@ -392,22 +536,30 @@ class ChartGenerator:
             fmt=".2f",
             linewidths=.5,
             vmin=0,
-            vmax=1
+            vmax=1,
+            square=True,
+            cbar_kws={'label': 'Score'}
         )
         
         # Format metric names for display
         formatted_metrics = [' '.join(word.capitalize() for word in metric.split('_')) for metric in metrics]
         
         # Add labels and title
-        plt.title('Model Performance Across Metrics', fontsize=16)
+        plt.title('Model Performance Across All RAGAS Metrics', fontsize=18, fontweight='bold')
         plt.xlabel('Metrics', fontsize=14)
         plt.ylabel('Models', fontsize=14)
         
         # Set x-axis labels to formatted metrics
-        ax.set_xticklabels(formatted_metrics, rotation=45, ha='right')
+        ax.set_xticklabels(formatted_metrics, rotation=45, ha='right', fontsize=11)
         
-        # Save the figure
-        return self._save_figure("metrics_heatmap")
+        # Set y-axis labels (model names) with larger font
+        ax.set_yticklabels(ax.get_yticklabels(), fontsize=11)
+        
+        # Adjust layout for better display
+        plt.tight_layout()
+        
+        # Save the figure with higher DPI
+        return self._save_figure("metrics_heatmap", dpi=300)
     
     def query_performance_chart(self, 
                               model_name: str,
@@ -593,17 +745,64 @@ class ChartGenerator:
         Returns:
             Path to the saved chart image
         """
-        # Define metrics to include
+        # Define all RAGAS metrics to include - same as radar chart
         metrics = [
             'factual_correctness',
-            'semantic_similarity',
+            'semantic_similarity', 
             'context_recall',
             'faithfulness',
-            'bleu_score'
+            'bleu_score',
+            'rogue_score',
+            'non_llm_string_similarity',  # Using exact database column name
+            'string_present'
         ]
         
+        # Try to get available columns from the database
+        try:
+            schema_query = """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'evaluation_metrics'
+            """
+            
+            available_columns = self._fetch_data(schema_query)
+            available_metrics = [col[0] for col in available_columns.values]
+            
+            # Print available columns for debugging
+            print("Available columns in evaluation_metrics table:")
+            for col in available_metrics:
+                print(f"  - {col}")
+            
+            # Check for string similarity-related columns with flexible matching
+            string_sim_variants = ['string_similarity', 'stringsimilarity', 'str_similarity', 'similarity_string']
+            string_sim_cols = [col for col in available_metrics if any(variant in col.lower() for variant in string_sim_variants)]
+            
+            if string_sim_cols:
+                print(f"Found potential string similarity columns: {string_sim_cols}")
+                # Replace our standard name with the actual column name from database
+                metrics = [string_sim_cols[0] if m == 'string_similarity' else m for m in metrics]
+            
+            # Filter metrics to only include those that exist
+            valid_metrics = [m for m in metrics if m in available_metrics]
+            
+            print(f"Using these metrics: {valid_metrics}")
+            
+            if not valid_metrics:
+                logger.error("No valid metrics found in database")
+                raise ValueError("No valid metrics available")
+                
+            # Build query with only valid metrics
+            metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in valid_metrics])
+            
+            # Update metrics list to what's actually available
+            metrics = valid_metrics
+        except Exception as e:
+            logger.error(f"Error querying schema: {e}")
+            print(f"Schema query error: {e}")
+            # If schema query fails, use default metrics approach
+            metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
+        
         # Define the query
-        metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
         query = f"""
         SELECT 
             m.name AS model_name,
@@ -627,9 +826,25 @@ class ChartGenerator:
             logger.warning("No data found")
             return "No data available"
         
-        # Ensure all data is numeric
+        # Print the dataframe columns to verify what data we have
+        print("\nColumns in returned data:")
+        print(df.columns.tolist())
+        
+        # Check if any string similarity column is present
+        sim_cols = [col for col in df.columns if 'similarity' in col.lower() and 'semantic' not in col.lower()]
+        if sim_cols:
+            print(f"Found similarity columns in results: {sim_cols}")
+            
+            # If we found a string similarity column but it's not in our metrics list, add it
+            for col in sim_cols:
+                if col not in metrics and 'string' in col.lower():
+                    print(f"Adding missing string similarity column: {col}")
+                    metrics.append(col)
+        
+        # Ensure all data is numeric and handle NaN values
         for col in metrics:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         # Reshape data for grouped bar chart
         df_melted = pd.melt(
@@ -646,7 +861,10 @@ class ChartGenerator:
         )
         
         # Create figure
-        plt.figure(figsize=(16, 10))
+        plt.figure(figsize=(16, 10), facecolor='white')
+        
+        # Use a more distinct color palette
+        palette = plt.cm.Dark2(np.linspace(0, 1, len(metrics)))
         
         # Create grouped bar chart
         ax = sns.barplot(
@@ -654,11 +872,11 @@ class ChartGenerator:
             x='model_name',
             y='Score',
             hue='Metric',
-            palette='viridis'
+            palette=palette
         )
         
         # Add labels and title
-        plt.title('Comprehensive Model Performance Across All Metrics', fontsize=16)
+        plt.title('Comprehensive Model Performance Across All RAGAS Metrics', fontsize=16, fontweight='bold')
         plt.xlabel('Model', fontsize=14)
         plt.ylabel('Score', fontsize=14)
         
@@ -673,14 +891,28 @@ class ChartGenerator:
                       ha='center', va='bottom',
                       fontsize=8, color='gray')
         
-        # Add legend outside the plot
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        # Add legend outside the plot with better formatting
+        plt.legend(title='Metrics', bbox_to_anchor=(1.05, 1), loc='upper left', frameon=True)
+        
+        # Add grid for easier reading
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        
+        # Ensure all bars are visible by adjusting y-axis to start at 0
+        plt.ylim(0, 1.0)
+        
+        # Add value labels on top of each bar
+        for p in ax.patches:
+            if p.get_height() > 0.05:  # Only label bars with significant height
+                ax.annotate(f'{p.get_height():.2f}', 
+                          (p.get_x() + p.get_width() / 2., p.get_height()),
+                          ha='center', va='bottom',
+                          fontsize=7, rotation=90)
         
         # Adjust layout
         plt.tight_layout()
         
         # Save the figure
-        return self._save_figure("all_models_all_metrics")
+        return self._save_figure("all_models_all_metrics", dpi=300)
         
     def ragas_radar_chart(self) -> str:
         """
@@ -697,7 +929,7 @@ class ChartGenerator:
             'context_recall',        # Measures how well context is utilized
             'faithfulness',          # Measures answer's faithfulness to the context
             'bleu_score',            # BLEU Score for lexical similarity
-            'string_similarity',      # String similarity measure
+            'non_llm_string_similarity',      # String similarity measure (exact column name)
             'rogue_score',           # ROUGE Score for summary evaluation
             'string_present'         # Presence of specific strings
         ]
