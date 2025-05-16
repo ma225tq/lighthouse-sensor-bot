@@ -16,6 +16,8 @@ Options:
     --model2        Second model for model-vs-model comparison
     --metric        Metric to use (default: factual_correctness)
     --limit         Maximum number of queries for query-performance chart (default: 10)
+    --max-questions Maximum number of questions for factual-correctness-matrix chart
+    --max-models    Maximum number of models for factual-correctness-matrix chart
     --output        Output directory (default: project_root/output/charts)
 """
 
@@ -51,6 +53,7 @@ def main():
             "model-vs-model", 
             "all-models-all-metrics",
             "ragas-radar-chart",
+            "factual-correctness-matrix",
             "all"
         ],
         default="all",
@@ -83,6 +86,20 @@ def main():
         type=int,
         default=10,
         help="Maximum number of queries for query-performance chart"
+    )
+    
+    parser.add_argument(
+        "--max-questions",
+        type=int,
+        default=8,
+        help="Maximum number of questions for factual-correctness-matrix chart"
+    )
+    
+    parser.add_argument(
+        "--max-models",
+        type=int,
+        default=8,
+        help="Maximum number of models for factual-correctness-matrix chart"
     )
     
     parser.add_argument(
@@ -145,6 +162,14 @@ def main():
     if args.chart_type in ["ragas-radar-chart", "all"]:
         print("Generating optimized RAGAS radar chart with all models and metrics...")
         path = chart_generator.ragas_radar_chart()
+        print(f"Chart saved: {path}")
+        
+    if args.chart_type in ["factual-correctness-matrix", "all"]:
+        print("Generating factual correctness matrix chart...")
+        path = chart_generator.factual_correctness_matrix(
+            max_questions=args.max_questions,
+            limit_models=args.max_models
+        )
         print(f"Chart saved: {path}")
 
 

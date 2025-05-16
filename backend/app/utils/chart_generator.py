@@ -239,7 +239,7 @@ class ChartGenerator:
                       (i, 0.01),
                       ha='center', va='bottom',
                       fontsize=10, color='gray')
-            
+        
         # Create shorter model names for the legend by cropping very long names
         df['short_name'] = df['model_name'].apply(lambda x: 
             (x[:25] + '...') if len(x) > 28 else x)
@@ -295,6 +295,7 @@ class ChartGenerator:
                 
             # Build query with only valid metrics
             metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in valid_metrics])
+            
             query = f"""
             SELECT 
                 {metrics_str},
@@ -365,7 +366,7 @@ class ChartGenerator:
             circle_angles = np.linspace(0, 2*np.pi, 100)
             # Draw the circle as a line
             ax.plot(circle_angles, [r] * len(circle_angles), color='black', linestyle='-', linewidth=0.6, alpha=0.3)
-            
+        
         # Set the angle labels
         plt.xticks(angles[:-1], metric_labels, fontsize=14, fontweight='bold')
         
@@ -464,7 +465,7 @@ class ChartGenerator:
             # Include all RAGAS metrics by default
             metrics = [
                 'factual_correctness',
-                'semantic_similarity', 
+                'semantic_similarity',
                 'context_recall',
                 'faithfulness',
                 'bleu_score',
@@ -823,7 +824,7 @@ class ChartGenerator:
         # Define all RAGAS metrics to include - same as radar chart
         metrics = [
             'factual_correctness',
-            'semantic_similarity', 
+            'semantic_similarity',
             'context_recall',
             'faithfulness',
             'bleu_score',
@@ -875,7 +876,7 @@ class ChartGenerator:
             logger.error(f"Error querying schema: {e}")
             print(f"Schema query error: {e}")
             # If schema query fails, use default metrics approach
-            metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
+        metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
         
         # Define the query
         query = f"""
@@ -1222,4 +1223,171 @@ class ChartGenerator:
         plt.tight_layout()
         
         # Save the figure with higher DPI for better quality
-        return self._save_figure("enhanced_ragas_metrics_radar_chart", dpi=300) 
+        return self._save_figure("enhanced_ragas_metrics_radar_chart", dpi=300)
+
+    def factual_correctness_matrix(self, max_questions: int = 8, limit_models: int = 8) -> str:
+        """
+        Generate a matrix chart showing factual correctness scores for individual questions across different models.
+        This displays the actual scores for each question rather than averages.
+        
+        Args:
+            max_questions: Maximum number of questions to include in the matrix
+            limit_models: Maximum number of models to include in the matrix
+            
+        Returns:
+            Path to the saved chart image
+        """
+        # First, get the questions and latest responses from each model
+        query = """
+        WITH latest_results AS (
+            SELECT 
+                qr.query,
+                m.name AS model_name,
+                em.factual_correctness,
+                ROW_NUMBER() OVER (PARTITION BY qr.query, m.name ORDER BY qr.timestamp DESC) as rn
+            FROM 
+                query_result qr
+                JOIN llm_models m ON qr.llm_model_id = m.id
+                JOIN query_evaluation qe ON qr.id = qe.query_result_id
+                JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+            WHERE
+                em.factual_correctness IS NOT NULL
+        )
+        SELECT 
+            query, 
+            model_name, 
+            factual_correctness
+        FROM 
+            latest_results
+        WHERE 
+            rn = 1
+        ORDER BY 
+            model_name, query
+        """
+        
+        # Fetch the data
+        try:
+            df = self._fetch_data(query)
+        except Exception as e:
+            logger.error(f"Error fetching matrix data: {e}")
+            return "Error fetching data"
+        
+        if df.empty:
+            logger.warning("No data found for factual correctness matrix")
+            return "No data available"
+        
+        # Ensure all data is numeric
+        df['factual_correctness'] = pd.to_numeric(df['factual_correctness'], errors='coerce').fillna(0)
+        
+        # Select top models based on average factual correctness
+        top_models_query = """
+        SELECT 
+            m.name AS model_name,
+            AVG(em.factual_correctness) AS avg_score,
+            COUNT(DISTINCT qr.query) AS question_count
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        WHERE
+            em.factual_correctness IS NOT NULL
+        GROUP BY 
+            m.name
+        ORDER BY 
+            avg_score DESC
+        LIMIT {}
+        """.format(limit_models)
+        
+        top_models = self._fetch_data(top_models_query)
+        model_list = top_models['model_name'].tolist()
+        
+        # Filter for just those models
+        df = df[df['model_name'].isin(model_list)]
+        
+        # Limit questions - get the most common questions across all models
+        question_counts = df['query'].value_counts().reset_index()
+        question_counts.columns = ['query', 'count']
+        common_questions = question_counts.head(max_questions)['query'].tolist()
+        
+        # Create simplified question labels (Q1, Q2, etc.)
+        question_display = {}
+        for i, q in enumerate(common_questions):
+            question_display[q] = f"Q{i+1}"
+        
+        # Filter for just those questions
+        df = df[df['query'].isin(common_questions)]
+        
+        # Pivot the data to create the matrix
+        matrix_df = df.pivot(index='model_name', columns='query', values='factual_correctness')
+        
+        # Replace column names with Q1, Q2, etc. labels
+        matrix_df = matrix_df.rename(columns=question_display)
+        
+        # Create figure with size based on number of questions
+        question_count = len(matrix_df.columns)
+        model_count = len(matrix_df.index)
+        
+        width = max(10, 8 + 0.4 * question_count)  # Base width plus adjustment for questions
+        height = max(8, 6 + 0.3 * model_count)    # Base height plus adjustment for models
+        
+        plt.figure(figsize=(width, height), facecolor='white')
+        
+        # Create the heatmap with a color gradient
+        cmap = plt.cm.RdYlGn  # Red-Yellow-Green colormap
+        
+        # Create the heatmap
+        ax = sns.heatmap(
+            matrix_df,
+            annot=True,
+            cmap=cmap,
+            vmin=0,
+            vmax=1,
+            linewidths=1,
+            linecolor='white',
+            fmt='.2f',
+            cbar_kws={'label': 'Factual Correctness Score'}
+        )
+        
+        # Customize the appearance
+        plt.title('RAGAS Factual Correctness Score by Model and Question', fontsize=16, fontweight='bold')
+        plt.xlabel('Questions', fontsize=14)
+        plt.ylabel('Models', fontsize=14)
+        
+        # Use horizontal alignment for x tick labels
+        plt.xticks(rotation=0, ha='center', fontsize=12, fontweight='bold')
+        
+        # Add a legend box under the questions
+        legend_handles = []
+        legend_labels = []
+        
+        # Create custom color squares for the legend
+        legend_colors = [
+            (cmap(0.1), '0.0 - 0.2'),
+            (cmap(0.3), '0.2 - 0.4'),
+            (cmap(0.5), '0.4 - 0.6'),
+            (cmap(0.7), '0.6 - 0.8'),
+            (cmap(0.9), '0.8 - 1.0')
+        ]
+        
+        for color, label in legend_colors:
+            legend_handles.append(plt.Rectangle((0, 0), 1, 1, color=color))
+            legend_labels.append(label)
+        
+        # Position the legend below the matrix
+        legend = plt.legend(
+            legend_handles, 
+            legend_labels,
+            title="Legend",
+            loc='upper center',
+            bbox_to_anchor=(0.5, -0.15),  # Move legend further down
+            ncol=len(legend_colors),
+            frameon=True
+        )
+        
+        # Adjust layout to make room for the legend
+        plt.tight_layout()
+        plt.subplots_adjust(bottom=0.22)  # Increase bottom padding significantly
+        
+        # Save the figure with higher DPI for better quality
+        return self._save_figure("factual_correctness_matrix", dpi=300) 

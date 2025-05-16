@@ -62,13 +62,31 @@ def main():
         print(f"Error generating radar chart: {e}")
         print("Please check if the model name exists in your database")
 
-    # Example 4: Generate heatmap for all models and metrics
-    print("\n4. Metrics Heatmap")
+    # Example 4: Generate model vs model comparison
+    model1 = "anthropic/claude-3.7-sonnet"
+    model2 = "qwen/qwen-2.5-72b-instruct"
+    print(f"\n4. Model vs Model Comparison: {model1} vs {model2}")
+    chart_path = chart_generator.model_vs_model_chart(
+        model1=model1, 
+        model2=model2
+    )
+    print(f"Chart saved: {chart_path}")
+
+    # Example 5: Generate factual correctness matrix chart
+    print("\n5. Factual Correctness Matrix Chart")
+    chart_path = chart_generator.factual_correctness_matrix(
+        max_questions=8,
+        limit_models=6
+    )
+    print(f"Chart saved: {chart_path}")
+
+    # Example 6: Generate heatmap for all models and metrics
+    print("\n6. Metrics Heatmap")
     chart_path = chart_generator.metrics_heatmap()
     print(f"Chart saved: {chart_path}")
 
-    # Example 5: Generate query performance chart for a specific model
-    print(f"\n5. Query Performance Chart for {model_name}")
+    # Example 7: Generate query performance chart for a specific model
+    print(f"\n7. Query Performance Chart for {model_name}")
     try:
         chart_path = chart_generator.query_performance_chart(
             model_name=model_name,
@@ -80,11 +98,11 @@ def main():
         print(f"Error generating query performance chart: {e}")
         print("Please check if the model name exists in your database")
 
-    # Example 6: Generate model vs model chart
+    # Example 8: Generate model vs model chart
     # Note: Replace these with actual model names from your database
     model1 = "qwen/qwen-2.5-72b-instruct"
     model2 = "openai/gpt-4o-2024-11-20"
-    print(f"\n6. Model vs Model Chart: {model1} vs {model2}")
+    print(f"\n8. Model vs Model Chart: {model1} vs {model2}")
     try:
         chart_path = chart_generator.model_vs_model_chart(
             model1=model1,
@@ -95,8 +113,8 @@ def main():
         print(f"Error generating model vs model chart: {e}")
         print("Please check if both model names exist in your database")
 
-    # Example 7: Generate comprehensive chart of all models and metrics
-    print("\n7. All Models All Metrics Chart")
+    # Example 9: Generate comprehensive chart of all models and metrics
+    print("\n9. All Models All Metrics Chart")
     chart_path = chart_generator.all_models_all_metrics()
     print(f"Chart saved: {chart_path}")
 

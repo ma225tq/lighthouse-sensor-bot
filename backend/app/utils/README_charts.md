@@ -12,6 +12,8 @@ The chart generator supports the following chart types:
 4. **Query Performance Chart** - Bar chart showing performance on individual queries for a specific model
 5. **Model vs Model Chart** - Side-by-side bar chart comparing two models across multiple metrics
 6. **All Models All Metrics** - Comprehensive grouped bar chart showing all models and all metrics
+7. **RAGAS Radar Chart** - Optimized radar chart showing all models across all RAGAS metrics
+8. **Factual Correctness Matrix** - Comparison matrix showing individual question scores for each model
 
 ## Usage
 
@@ -44,7 +46,10 @@ python backend/app/utils/generate_charts.py
 python backend/app/utils/generate_charts.py --chart-type model-comparison --metric bleu_score
 
 # Generate radar chart for a specific model
-python backend/app/utils/generate_charts.py --chart-type model-metrics --model "qwen/qwen-2.5-72b-instruct"
+python backend/app/utils/generate_charts.py --chart-type model-metrics --model "anthropic/claude-3.7-sonnet"
+
+# Generate a matrix chart showing factual correctness for each question-model pair
+python backend/app/utils/generate_charts.py --chart-type factual-correctness-matrix --max-questions 10 --max-models 6
 
 # Compare two models side by side
 python backend/app/utils/generate_charts.py --chart-type model-vs-model --model1 "qwen/qwen-2.5-72b-instruct" --model2 "openai/gpt-4o-2024-11-20"
