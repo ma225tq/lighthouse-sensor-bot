@@ -2,5 +2,6 @@
 output/
 
 tmp.txt
+tmp.md
 
 failed_tests/

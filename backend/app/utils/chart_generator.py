@@ -466,12 +466,10 @@ class ChartGenerator:
             metrics = [
                 'factual_correctness',
                 'semantic_similarity',
-                'context_recall',
                 'faithfulness',
                 'bleu_score',
                 'rogue_score',
-                'non_llm_string_similarity',  # Using exact database column name
-                'string_present'
+                'non_llm_string_similarity'  # Using exact database column name
             ]
         
         # Try to get available columns from the database
@@ -680,12 +678,10 @@ class ChartGenerator:
             metrics = [
                 'factual_correctness',
                 'semantic_similarity',
-                'context_recall',
                 'faithfulness',
                 'bleu_score',
                 'rogue_score',
-                'non_llm_string_similarity',
-                'string_present'
+                'non_llm_string_similarity'
             ]
         
         # Get available columns from the database to ensure we only query existing metrics
@@ -825,12 +821,10 @@ class ChartGenerator:
         metrics = [
             'factual_correctness',
             'semantic_similarity',
-            'context_recall',
             'faithfulness',
             'bleu_score',
             'rogue_score',
             'non_llm_string_similarity',  # Using exact database column name
-            'string_present'
         ]
         
         # Try to get available columns from the database
@@ -1002,12 +996,10 @@ class ChartGenerator:
         metrics = [
             'factual_correctness',   # Measures the factual accuracy
             'semantic_similarity',    # Measures semantic similarity to reference
-            'context_recall',        # Measures how well context is utilized
             'faithfulness',          # Measures answer's faithfulness to the context
             'bleu_score',            # BLEU Score for lexical similarity
             'non_llm_string_similarity',      # String similarity measure (exact column name)
             'rogue_score',           # ROUGE Score for summary evaluation
-            'string_present'         # Presence of specific strings
         ]
         
         # Define the query with error handling for missing columns

@@ -280,7 +280,7 @@ export default function QuestionForm() {
     setModelCategory(category);
     // Set a default model for the selected category
     if (category === "proprietary") {
-      setSelectedModel("openai/gpt-4o-2024-11-20");
+      setSelectedModel("anthropic/claude-3.7-sonnet");
     } else {
       setSelectedModel("qwen/qwen-2.5-72b-instruct");
     }
@@ -714,10 +714,7 @@ export default function QuestionForm() {
                       >
                         {modelCategory === "proprietary" ? (
                           <>
-                            <option value="openai/gpt-4o-2024-11-20">OpenAI GPT-4o</option>
                             <option value="anthropic/claude-3.7-sonnet">Claude 3.7 Sonnet</option>
-                            <option value="google/gemini-2.5-flash-preview">Gemini 2.5 Flash Preview</option>
-                            <option value="amazon/nova-pro-v1">Amazon Nova Pro</option>
                           </>
                         ) : (
                           <>
@@ -872,6 +869,10 @@ export default function QuestionForm() {
                   </>
                 )}
 
+                
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+                  <p>Lighthouse Bot can make mistakes. Please consider the answers carefully.</p>
+                </div>
   
               </div>
             </div>
