@@ -79,6 +79,7 @@ class LenientFactualCorrectness(SingleTurnMetric):
 
     async def extract_first_number(self, text: str, query: str) -> t.Optional[float]:
         """Extract the first relevant number from text using OpenRouter API directly."""
+        print(f"DEBUG: response: {text}")
         if not text:
             return None
             

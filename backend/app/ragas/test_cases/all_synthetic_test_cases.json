@@ -15,7 +15,7 @@
     "reference_contexts": [
       "The average speed of ferry Jupiter is: 6.23 knots. Average speed in km/h: 11.55 km/h."
     ],
-    "ground_truth": "Average speed in km/h is 11.55 km/h",
+    "ground_truth": "The average speed of ferry Jupiter in km/h is: 11.55 km/h",
     "extracted_true_value": "11.55",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
@@ -25,8 +25,8 @@
     "reference_contexts": [
       "Analysis of Vehicles Left at Terminal for Inbound Trips: Average vehicles left at terminal per inbound trip: 0.3270"
     ],
-    "ground_truth": " On average, 0.3270 vehicles are left at the terminal for inbound trips.",
-    "extracted_true_value": "0.3270",
+    "ground_truth": "On average, 0.33 vehicles are left at the terminal for inbound trips.",
+    "extracted_true_value": "0.33",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
   {
@@ -35,27 +35,27 @@
     "reference_contexts": [
       "Month 6 (June): 1512 trips. Month 7 (July): 1556 trips. Month 8 (August): 1543 trips. Total vehicles left at terminal (unable to board) for ferry Jupiter during months 6, 7, 8: 14594. Total number of trips for ferry Jupiter during these months: 4611. The average number of vehicles left at the terminal per trip: 3.17"
     ],
-    "ground_truth": "The average number of vehicles left at the terminal per trip: 3.17",
+    "ground_truth": "The average number of vehicles left at the terminal per trip is: 3.17",
     "extracted_true_value": "3.17",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
   {
     "test_no": 5,
-    "query": "Which route has the highest average distance travelled, considering both outbound and inbound directions?",
+    "query": "What is the highest average daily PCE (Passenger Car Equivalent) value for Furusundsleden route? (outbound and inbound combined)?",
     "reference_contexts": [
-      "Average distances by route (in nautical miles):  Aspöleden: 3.22 NM, Ljusteröleden: 0.57 NM, Vaxholmsleden: 0.49 NM, Oxdjupsleden: 0.25 NM, Furusundsleden: 0.23 NM. The route with the highest average distance travelled is: Aspöleden with an average distance of 3.22 NM."
+      "Furusundsleden Daily PCE Analysis:\nAverage PCE by day of week:\nMonday: 37.05 PCE (2184 trips)\nTuesday: 36.49 PCE (2173 trips)\nWednesday: 37.27 PCE (2198 trips)\nThursday: 38.42 PCE (2251 trips)\nFriday: 40.33 PCE (2308 trips)\nSaturday: 30.23 PCE (2161 trips)\nSunday: 31.78 PCE (2267 trips)"
     ],
-    "ground_truth": "The route with the highest average distance travelled is: Aspöleden with an average distance of 3.22 NM.",
-    "extracted_true_value": "3.22",
+    "ground_truth": "The highest average daily PCE value for Furusundsleden route is 40.33.",
+    "extracted_true_value": "40.33",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
   {
     "test_no": 6,
-    "query": "What is the average distance travelled on Ljusteröleden?",
+    "query": "What is the average distance travelled on Ljusteröleden (in nautical miles)?",
     "reference_contexts": [
       "The average distance travelled on Ljusteröleden is: 0.57 NM."
     ],
-    "ground_truth": "The average distance travelled on Ljusteröleden is: 0.57 NM.",
+    "ground_truth": "The average distance travelled on Ljusteröleden is 0.57 nautical miles.",
     "extracted_true_value": "0.57",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
@@ -73,7 +73,7 @@
     "test_no": 8,
     "query": "What is the average fuel consumption on the route Ljusterö to Östanå, combining both outbound and inbound?",
     "reference_contexts": [
-      "Average outbound (Ljusterö to Östanå): 7.00 liters. Average inbound (Östanå to Ljusterö): 6.98 liters. The average combined fuel consumption on the route Ljusterö to Östanå: 13.98 liters per trip"
+      "Average outbound (Ljusterö to Östanå): 7.00 liters\nAverage inbound (Östanå to Ljusterö): 6.98 liters\nAverage total fuel consumption per trip: 13.98 liters"
     ],
     "ground_truth": "The average combined fuel consumption on the route Ljusterö to Östanå: 13.98 liters per trip",
     "extracted_true_value": "13.98",
@@ -81,7 +81,7 @@
   },
   {
     "test_no": 9,
-    "query": "What is the average trip duration for Oxdjupsleden?",
+    "query": "What is the average trip duration for Oxdjupsleden (in minutes)?",
     "reference_contexts": [
       "Average Trip Duration for Oxdjupsleden: Outbound: 3.16 minutes. Inbound: 3.09 minutes. The average trip duration is 3.12 minutes"
     ],
@@ -91,11 +91,11 @@
   },
   {
     "test_no": 10,
-    "query": "Which ferry has the best fuel efficiency, and what is its liters per nautical mile?",
+    "query": "What is the fuel consumption (liters per nautical mile) for ferry Merkurius?",
     "reference_contexts": [
-      "Fuel Efficiency Analysis (liters per nautical mile): Lower values indicate better fuel efficiency: Merkurius: 6.08 L/NM. Nina: 8.37 L/NM. Yxlan: 10.82 L/NM. Fragancia: 11.92 L/NM. Jupiter: 12.30 L/NM. The most fuel-efficient ferry is: Merkurius: 6.08 L/NM"
+      "Fuel Efficiency Analysis (liters per nautical mile):Lower values indicate better fuel efficiency\nMerkurius: 6.08 L/NM\nNina: 8.37 L/NM\nYxlan: 10.82 L/NM\nFragancia: 11.92 L/NM\nJupiter: 12.30 L/NM"
     ],
-    "ground_truth": "The most fuel-efficient ferry is: Merkurius: 6.08 L/NM",
+    "ground_truth": "The most fuel-efficient ferry is Merkurius with a consumption of 6.08 L/NM",
     "extracted_true_value": " 6.08",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
@@ -153,10 +153,10 @@
     "test_no": 16,
     "query": "What is the average passenger car equivalent (PCE) during June, July, August for Vaxholmsleden route (calculated as the mean of the average inbound PCE and average outbound PCE)?",
     "reference_contexts": [
-        "Monthly breakdown of average PCE for Vaxholmsleden during summer:\nJune: 46.41 PCE\nJuly: 39.54 PCE\nAugust: 40.53 PCE\nCombined average PCE: 42.06."
+        "Monthly breakdown of average PCE for Vaxholmsleden during summer:\nJune: 23.21 PCE\nJuly: 19.77 PCE\nAugust: 20.26 PCE\nOutbound average PCE: 20.71\nInbound average PCE: 21.35\nCombined average PCE: 21.03."
     ],
-    "ground_truth": "The average PCE during June, July and August for Vaxholmsleden route is 42.06",
-    "extracted_true_value": "42.06",
+    "ground_truth": "The average PCE during June, July and August for Vaxholmsleden route is 21.03.",
+    "extracted_true_value": "21.03",
     "synthesizer_name": "single_hop_specifc_query_synthesizer"
   },
   {

@@ -137,6 +137,8 @@ def process_query_internal(question: str, source_file: Optional[str] = None, llm
                 fullResponse += f"```sql\n{sql}\n```\n\n"
         fullResponse += f"## Response\n{response.content}\n\n"
         
+        print(f"DEBUG - FULL RESPONSE: {fullResponse}")
+        
         # Extract clean answer
         clean_answer = extract_answer_for_evaluation(response.content)
         
