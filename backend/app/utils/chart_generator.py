@@ -1004,59 +1004,137 @@ class ChartGenerator:
             lambda x: ' '.join(word.capitalize() for word in x.split('_'))
         )
         
-        # Create figure
-        plt.figure(figsize=(16, 10), facecolor='white')
+        # Close any existing figures
+        plt.close('all')
         
-        # Use a more distinct color palette
-        palette = plt.cm.Dark2(np.linspace(0, 1, len(metrics)))
+        # Calculate dynamic figure size based on number of models and metrics
+        model_count = len(df['model_name'].unique())
+        metric_count = len(metrics)
         
-        # Create grouped bar chart
+        # Base width plus additional width for more metrics
+        width = max(16, 12 + metric_count * 0.5)
+        # Base height plus additional height for more models
+        height = max(10, 6 + model_count * 0.8)
+        
+        # Create figure with white background
+        fig, ax = plt.subplots(figsize=(width, height), facecolor='white', dpi=150)
+        
+        # Create custom blue color palette that matches the application theme
+        # Using colors from light to dark blue for better distinction
+        from matplotlib.colors import LinearSegmentedColormap
+        
+        # Define the number of distinct colors needed (one per metric)
+        n_colors = len(metrics)
+        
+        # Create a vibrant and diverse color palette instead of just blues
+        # This palette provides better distinction between metrics
+        vibrant_colors = [
+            "#3498db",  # Blue
+            "#e74c3c",  # Red
+            "#2ecc71",  # Green
+            "#9b59b6",  # Purple
+            "#f39c12",  # Orange
+            "#1abc9c",  # Turquoise
+            "#d35400",  # Dark Orange
+            "#34495e",  # Navy Blue
+            "#16a085",  # Teal
+            "#c0392b",  # Dark Red
+            "#8e44ad",  # Violet
+            "#27ae60"   # Emerald
+        ]
+        
+        # Extend the palette if we have more metrics than colors
+        if n_colors > len(vibrant_colors):
+            vibrant_colors = vibrant_colors * (n_colors // len(vibrant_colors) + 1)
+        
+        # Use only as many colors as needed
+        custom_colors = vibrant_colors[:n_colors]
+        
+        # Create grouped bar chart with custom colors
         ax = sns.barplot(
             data=df_melted,
             x='model_name',
             y='Score',
             hue='Metric',
-            palette=palette
+            palette=custom_colors,
+            saturation=0.95,
+            dodge=True,
+            alpha=0.9
         )
         
         # Add labels and title
-        plt.title('Comprehensive Model Performance Across All RAGAS Metrics', fontsize=16, fontweight='bold')
-        plt.xlabel('Model', fontsize=14)
-        plt.ylabel('Score', fontsize=14)
+        ax.set_title('Comprehensive Model Performance Across All Metrics', 
+                   fontsize=20, 
+                   fontweight='bold',
+                   pad=20)
+        ax.set_xlabel('Model', fontsize=16, fontweight='bold', labelpad=15)
+        ax.set_ylabel('Average Score', fontsize=16, fontweight='bold', labelpad=15)
         
-        # Rotate x-axis labels for better readability
-        plt.xticks(rotation=45, ha='right')
+        # Dynamic x-label rotation based on number of models
+        rotation = min(45, max(0, model_count * 5))  # 0° for few models, up to 45° for many
+        plt.xticks(rotation=rotation, ha='right' if rotation > 0 else 'center', fontsize=12)
         
-        # Add the number of queries per model
+        # Improve y-axis ticks
+        plt.yticks(fontsize=12)
+        
+        # Add the number of queries per model with better formatting
         model_positions = {model: i for i, model in enumerate(df['model_name'].unique())}
         for model, count in zip(df['model_name'].unique(), df['query_count'].unique()):
+            # Add counts at the bottom of the chart with improved visual appeal
             ax.annotate(f'n={count}',
-                      (model_positions[model], 0.02),
-                      ha='center', va='bottom',
-                      fontsize=8, color='gray')
+                      xy=(model_positions[model], -0.02),
+                      xytext=(0, -10),  # Offset below x-axis
+                      textcoords='offset points',
+                      ha='center', va='top',
+                      fontsize=10, fontweight='bold',
+                      color='#555555',
+                      bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="none", alpha=0.8))
         
-        # Add legend outside the plot with better formatting
-        plt.legend(title='Metrics', bbox_to_anchor=(1.05, 1), loc='upper left', frameon=True)
+        # Add legend with improved formatting
+        legend = plt.legend(
+            title='Metrics', 
+            bbox_to_anchor=(1.02, 1),  # Position outside the plot
+            loc='upper left',
+            frameon=True,
+            fontsize=11,
+            title_fontsize=14,
+            framealpha=0.95,
+            edgecolor='#cccccc'
+        )
         
-        # Add grid for easier reading
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        # Add grid for better readability
+        plt.grid(axis='y', linestyle='--', alpha=0.3, zorder=0)
         
         # Ensure all bars are visible by adjusting y-axis to start at 0
-        plt.ylim(0, 1.0)
+        # Add 10% padding at the top for labels
+        max_score = df_melted['Score'].max()
+        ax.set_ylim(0, min(1.0, max_score * 1.15))
         
-        # Add value labels on top of each bar
+        # Add value labels on top of each bar with improved formatting
         for p in ax.patches:
-            if p.get_height() > 0.05:  # Only label bars with significant height
-                ax.annotate(f'{p.get_height():.2f}', 
-                          (p.get_x() + p.get_width() / 2., p.get_height()),
-                          ha='center', va='bottom',
-                          fontsize=7, rotation=90)
+            height = p.get_height()
+            if height > 0.05:  # Only label bars with significant height
+                ax.annotate(
+                    f'{height:.2f}', 
+                    xy=(p.get_x() + p.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom',
+                    fontsize=9, fontweight='bold',
+                    color='#333333',
+                    bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.8)
+                )
+        
+        # Add border around the plot for better definition
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+            spine.set_color('#333333')
         
         # Adjust layout
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0.05, 0.85, 0.98])
         
-        # Save the figure
-        return self._save_figure("all_models_all_metrics", dpi=300)
+        # Save the figure with high DPI for quality
+        return self._save_figure("all_models_all_metrics", fig=fig, dpi=300)
         
     def ragas_radar_chart(self) -> str:
         """
@@ -1494,10 +1572,6 @@ class ChartGenerator:
             ncol=min(len(legend_colors), 5),  # Ensure the legend isn't too wide
             frameon=True
         )
-        
-        # Add a note about averaging
-        plt.figtext(0.5, -0.01, "Note: Values represent the average score across multiple evaluations of the same question",
-                   ha="center", fontsize=10, fontstyle="italic")
         
         # Adjust layout to make room for the legend and note
         plt.tight_layout()
