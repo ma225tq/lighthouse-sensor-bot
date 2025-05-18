@@ -752,48 +752,75 @@ class ChartGenerator:
             lambda x: ' '.join(word.capitalize() for word in x.split('_'))
         )
         
-        # Create figure
-        plt.figure(figsize=(14, 8), facecolor='white')
+        # Completely fresh approach - use a custom plotting method
         
-        # Create grouped bar chart with improved colors
+        # Close any existing plots and start fresh
+        plt.close('all')
+        
+        # Create a new figure and axis
+        fig, ax = plt.subplots(figsize=(14, 8), facecolor='white')
+        
+        # Get unique metrics and models
+        metrics_display = df_melted['Metric'].unique()
+        models = df_melted['model_name'].unique()
+        num_metrics = len(metrics_display)
+        
+        # Define colors
         colors = ['#1f77b4', '#ff7f0e']  # Blue and orange for better contrast
         
-        ax = sns.barplot(
-            data=df_melted,
-            x='Metric',
-            y='Score',
-            hue='model_name',
-            palette=colors
-        )
+        # Custom bar positioning
+        width = 0.35  # Width of the bars
+        x = np.arange(num_metrics)  # Metric positions on x-axis
         
-        # Add labels and title
-        plt.title(f'Model Comparison: {model1} vs {model2}', fontsize=16, fontweight='bold')
-        plt.xlabel('Metric', fontsize=14)
-        plt.ylabel('Score', fontsize=14)
+        # Custom bar plot to replace seaborn's barplot
+        for i, model in enumerate(models):
+            model_data = df_melted[df_melted['model_name'] == model]
+            
+            # Get scores for each metric
+            scores = [model_data[model_data['Metric'] == metric]['Score'].values[0] 
+                     for metric in metrics_display]
+            
+            # Plot bars with offset positions
+            offset = width * (i - 0.5)
+            bars = ax.bar(x + offset, scores, width, label=model, color=colors[i], zorder=5)
+            
+            # Add text annotations for each bar
+            for j, bar in enumerate(bars):
+                height = bar.get_height()
+                ax.annotate(f'{height:.2f}',
+                          xy=(bar.get_x() + bar.get_width() / 2, height),
+                          xytext=(0, 3),  # 3 points vertical offset
+                          textcoords="offset points",
+                          ha='center', va='bottom',
+                          fontsize=10, fontweight='bold', zorder=10)
+        
+        # Configure the rest of the chart
+        ax.set_title(f'Model Comparison: {model1} vs {model2}', fontsize=16, fontweight='bold')
+        ax.set_xlabel('Metric', fontsize=14)
+        ax.set_ylabel('Score', fontsize=14)
+        
+        # Place metrics at the center of each group
+        ax.set_xticks(x)
+        ax.set_xticklabels(metrics_display)
         
         # Add grid for better readability
-        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        ax.grid(axis='y', linestyle='--', alpha=0.3, zorder=0)
         
         # Ensure y-axis starts at 0 and ends at 1.0 for better comparison
-        plt.ylim(0, 1.0)
+        ax.set_ylim(0, 1.0)
         
-        # Add data labels with values
-        for p in ax.patches:
-            ax.annotate(f'{p.get_height():.2f}', 
-                      (p.get_x() + p.get_width() / 2., p.get_height()),
-                      ha='center', va='bottom',
-                      fontsize=10, fontweight='bold')
-        
-        # Improve legend with custom title
-        plt.legend(title='Model Name', loc='upper right')
+        # Add legend
+        ax.legend(title='Model Name', loc='upper right')
         
         # Adjust layout
-        plt.tight_layout()
+        fig.tight_layout()
         
         # Save the figure with sanitized filename
         safe_model1 = self._sanitize_filename(model1)
         safe_model2 = self._sanitize_filename(model2)
-        return self._save_figure(f"model_comparison_{safe_model1}_vs_{safe_model2}", dpi=300)
+        
+        # Save the figure with the custom plotting approach
+        return self._save_figure(f"model_comparison_{safe_model1}_vs_{safe_model2}", fig=fig, dpi=300)
 
     def all_models_all_metrics(self) -> str:
         """
