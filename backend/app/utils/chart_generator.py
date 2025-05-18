@@ -9,6 +9,8 @@ from contextlib import contextmanager
 from typing import List, Dict, Any, Optional, Tuple, Union
 import logging
 import decimal
+import json
+from matplotlib.colors import LinearSegmentedColormap
 
 # Import our custom database configuration
 try:
@@ -1289,44 +1291,33 @@ class ChartGenerator:
         # Save the figure with higher DPI for better quality
         return self._save_figure("enhanced_ragas_metrics_radar_chart", dpi=300)
 
-    def factual_correctness_matrix(self, max_questions: int = 8, limit_models: int = 8) -> str:
+    def factual_correctness_matrix(self, max_questions: int = 20, limit_models: int = 8) -> str:
         """
         Generate a matrix chart showing factual correctness scores for individual questions across different models.
-        This displays the actual scores for each question rather than averages.
+        This displays the average scores for each question rather than just the latest evaluation.
         
         Args:
-            max_questions: Maximum number of questions to include in the matrix
+            max_questions: Maximum number of questions to include in the matrix (default increased to 20)
             limit_models: Maximum number of models to include in the matrix
             
         Returns:
             Path to the saved chart image
         """
-        # First, get the questions and latest responses from each model
+        # Query to get ALL results (not just latest) for each model and question
         query = """
-        WITH latest_results AS (
-            SELECT 
-                qr.query,
-                m.name AS model_name,
-                em.factual_correctness,
-                ROW_NUMBER() OVER (PARTITION BY qr.query, m.name ORDER BY qr.timestamp DESC) as rn
-            FROM 
-                query_result qr
-                JOIN llm_models m ON qr.llm_model_id = m.id
-                JOIN query_evaluation qe ON qr.id = qe.query_result_id
-                JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
-            WHERE
-                em.factual_correctness IS NOT NULL
-        )
         SELECT 
-            query, 
-            model_name, 
-            factual_correctness
+            qr.query,
+            m.name AS model_name,
+            em.factual_correctness
         FROM 
-            latest_results
-        WHERE 
-            rn = 1
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        WHERE
+            em.factual_correctness IS NOT NULL
         ORDER BY 
-            model_name, query
+            m.name, qr.query
         """
         
         # Fetch the data
@@ -1343,100 +1334,155 @@ class ChartGenerator:
         # Ensure all data is numeric
         df['factual_correctness'] = pd.to_numeric(df['factual_correctness'], errors='coerce').fillna(0)
         
-        # Select top models based on average factual correctness
-        top_models_query = """
-        SELECT 
-            m.name AS model_name,
-            AVG(em.factual_correctness) AS avg_score,
-            COUNT(DISTINCT qr.query) AS question_count
-        FROM 
-            query_result qr
-            JOIN llm_models m ON qr.llm_model_id = m.id
-            JOIN query_evaluation qe ON qr.id = qe.query_result_id
-            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
-        WHERE
-            em.factual_correctness IS NOT NULL
-        GROUP BY 
-            m.name
-        ORDER BY 
-            avg_score DESC
-        LIMIT {}
-        """.format(limit_models)
+        # Calculate average factual correctness for each model/question pair
+        avg_df = df.groupby(['model_name', 'query'])['factual_correctness'].mean().reset_index()
         
-        top_models = self._fetch_data(top_models_query)
-        model_list = top_models['model_name'].tolist()
+        # Also count evaluations per model for selection and display purposes
+        eval_counts = df.groupby('model_name')['query'].count().reset_index()
+        eval_counts.columns = ['model_name', 'eval_count']
         
-        # Filter for just those models
-        df = df[df['model_name'].isin(model_list)]
+        # Load the test cases to get the official test numbers
+        try:
+            test_cases_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+                                        'app', 'ragas', 'test_cases', 'synthetic_test_cases.json')
+            with open(test_cases_path, 'r') as f:
+                test_cases = json.load(f)
+            
+            # Create a mapping from query text to test_no
+            query_to_test_no = {}
+            for test in test_cases:
+                if 'query' in test and 'test_no' in test:
+                    query_to_test_no[test['query']] = test['test_no']
+            
+            # Log the mapping for debugging
+            logger.info(f"Found {len(query_to_test_no)} test cases with query-to-test_no mapping")
+            
+            # Add test_no to the dataframe
+            avg_df['test_no'] = avg_df['query'].apply(lambda q: query_to_test_no.get(q, 999))  # Default high number for unknown
+        except Exception as e:
+            logger.error(f"Error loading test cases: {e}")
+            # If we can't load the test cases, create a column with sequential numbers
+            unique_queries = avg_df['query'].unique()
+            query_to_test_no = {q: i+1 for i, q in enumerate(unique_queries)}
+            avg_df['test_no'] = avg_df['query'].apply(lambda q: query_to_test_no.get(q, 999))
         
-        # Limit questions - get the most common questions across all models
-        question_counts = df['query'].value_counts().reset_index()
-        question_counts.columns = ['query', 'count']
-        common_questions = question_counts.head(max_questions)['query'].tolist()
+        # Get top models based on average factual correctness
+        model_avg_scores = avg_df.groupby('model_name')['factual_correctness'].mean().reset_index()
+        model_avg_scores = model_avg_scores.sort_values('factual_correctness', ascending=False)
+        top_models = model_avg_scores.head(limit_models)['model_name'].tolist()
         
-        # Create simplified question labels (Q1, Q2, etc.)
+        # Filter data for just those models
+        avg_df = avg_df[avg_df['model_name'].isin(top_models)]
+        
+        # Get questions sorted by test_no instead of frequency
+        question_test_no = avg_df[['query', 'test_no']].drop_duplicates()
+        question_test_no = question_test_no.sort_values('test_no')
+        common_questions = question_test_no.head(max_questions)['query'].tolist()
+        
+        # Create simplified question labels (Q1, Q2, etc.) that match the test_no
         question_display = {}
-        for i, q in enumerate(common_questions):
-            question_display[q] = f"Q{i+1}"
+        for q in common_questions:
+            test_no = query_to_test_no.get(q, 0)
+            if test_no > 0 and test_no < 100:  # Reasonable test_no range
+                question_display[q] = f"Q{test_no}"
+            else:
+                # Fallback to order in list if test_no is missing or invalid
+                question_display[q] = f"Q{common_questions.index(q) + 1}"
         
         # Filter for just those questions
-        df = df[df['query'].isin(common_questions)]
+        avg_df = avg_df[avg_df['query'].isin(common_questions)]
         
-        # Pivot the data to create the matrix
-        matrix_df = df.pivot(index='model_name', columns='query', values='factual_correctness')
+        # Pivot the data to create the matrix using the averaged values
+        matrix_df = avg_df.pivot(index='model_name', columns='query', values='factual_correctness')
         
         # Replace column names with Q1, Q2, etc. labels
         matrix_df = matrix_df.rename(columns=question_display)
+        
+        # Reorder columns by test number
+        ordered_columns = sorted(matrix_df.columns, key=lambda x: int(x[1:]) if x[1:].isdigit() else 999)
+        matrix_df = matrix_df[ordered_columns]
         
         # Create figure with size based on number of questions
         question_count = len(matrix_df.columns)
         model_count = len(matrix_df.index)
         
-        width = max(10, 8 + 0.4 * question_count)  # Base width plus adjustment for questions
-        height = max(8, 6 + 0.3 * model_count)    # Base height plus adjustment for models
+        # Improved sizing formula for better scaling with many questions
+        # Increase width more aggressively as question count grows
+        # More balanced sizing with larger question counts to keep cells square-ish
+        width = max(12, 8 + 0.4 * question_count)  # Base width plus adjustment for questions
+        height = max(8, 6 + 0.45 * model_count)    # Base height plus adjustment for models
         
-        plt.figure(figsize=(width, height), facecolor='white')
+        # Adjust cell size as question count increases
+        cell_size_factor = 1.0 if question_count <= 8 else (1.0 - min(0.4, (question_count - 8) * 0.025))
+        
+        # Set up the figure with a high-resolution DPI for better scaling
+        plt.figure(figsize=(width * cell_size_factor, height), facecolor='white', dpi=150)
         
         # Create the heatmap with a color gradient
-        cmap = plt.cm.RdYlGn  # Red-Yellow-Green colormap
+        # Replace RdYlGn with a custom color scheme that matches the application theme
+        from matplotlib.colors import LinearSegmentedColormap
         
-        # Create the heatmap
+        # Create a custom colormap that transitions from light blue to dark blue
+        # This matches the application's blue theme better than the red-yellow-green
+        colors = ["#ffffff", "#d4e6f1", "#a9cce3", "#7fb3d5", "#5499c7", "#2980b9", "#1f618d", "#154360"]
+        custom_cmap = LinearSegmentedColormap.from_list("app_blues", colors)
+        
+        # Create the heatmap with appropriate cell sizes
         ax = sns.heatmap(
             matrix_df,
             annot=True,
-            cmap=cmap,
+            cmap=custom_cmap,  # Custom blue colormap
             vmin=0,
             vmax=1,
-            linewidths=1,
+            linewidths=max(0.5, 1.0 * cell_size_factor),  # Thinner lines for more cells
             linecolor='white',
             fmt='.2f',
-            cbar_kws={'label': 'Factual Correctness Score'}
+            annot_kws={"color": "black", 
+                      "fontweight": "bold",
+                      "fontsize": max(8, 10 * cell_size_factor)},  # Smaller text for more cells
+            cbar_kws={'label': 'Factual Correctness Score',
+                     'shrink': min(1.0, 0.8 + 0.2 * cell_size_factor)}  # Adjust colorbar size
         )
         
+        # Ensure square cells for better appearance
+        ax.set_aspect('equal', adjustable='box')
+        
         # Customize the appearance
-        plt.title('RAGAS Factual Correctness Score by Model and Question', fontsize=16, fontweight='bold')
+        plt.title('Average RAGAS Factual Correctness Score by Model and Question', 
+                 fontsize=16, 
+                 fontweight='bold',
+                 pad=20)  # Add padding between title and plot
         plt.xlabel('Questions', fontsize=14)
         plt.ylabel('Models', fontsize=14)
         
-        # Use horizontal alignment for x tick labels
-        plt.xticks(rotation=0, ha='center', fontsize=12, fontweight='bold')
+        # Dynamic label rotation based on number of questions
+        # Use horizontal for few questions, angled for many
+        if question_count <= 8:
+            plt.xticks(rotation=0, ha='center', fontsize=12, fontweight='bold')
+        else:
+            # Use rotated labels for larger question counts
+            rotation = min(45, max(20, question_count * 1.5))  # Scale rotation with question count
+            plt.xticks(rotation=rotation, ha='right', fontsize=11, fontweight='bold')
         
         # Add a legend box under the questions
         legend_handles = []
         legend_labels = []
         
-        # Create custom color squares for the legend
+        # Create custom color squares for the legend with the new color scheme
         legend_colors = [
-            (cmap(0.1), '0.0 - 0.2'),
-            (cmap(0.3), '0.2 - 0.4'),
-            (cmap(0.5), '0.4 - 0.6'),
-            (cmap(0.7), '0.6 - 0.8'),
-            (cmap(0.9), '0.8 - 1.0')
+            (custom_cmap(0.1), '0.0 - 0.2'),
+            (custom_cmap(0.3), '0.2 - 0.4'),
+            (custom_cmap(0.5), '0.4 - 0.6'),
+            (custom_cmap(0.7), '0.6 - 0.8'),
+            (custom_cmap(0.9), '0.8 - 1.0')
         ]
         
         for color, label in legend_colors:
             legend_handles.append(plt.Rectangle((0, 0), 1, 1, color=color))
             legend_labels.append(label)
+        
+        # Position the legend - adjust for question count
+        legend_position = -0.12 if question_count < 10 else -0.08  # Less bottom padding for more questions
         
         # Position the legend below the matrix
         legend = plt.legend(
@@ -1444,14 +1490,21 @@ class ChartGenerator:
             legend_labels,
             title="Legend",
             loc='upper center',
-            bbox_to_anchor=(0.5, -0.15),  # Move legend further down
-            ncol=len(legend_colors),
+            bbox_to_anchor=(0.5, legend_position),
+            ncol=min(len(legend_colors), 5),  # Ensure the legend isn't too wide
             frameon=True
         )
         
-        # Adjust layout to make room for the legend
-        plt.tight_layout()
-        plt.subplots_adjust(bottom=0.22)  # Increase bottom padding significantly
+        # Add a note about averaging
+        plt.figtext(0.5, -0.01, "Note: Values represent the average score across multiple evaluations of the same question",
+                   ha="center", fontsize=10, fontstyle="italic")
         
-        # Save the figure with higher DPI for better quality
+        # Adjust layout to make room for the legend and note
+        plt.tight_layout()
+        
+        # Dynamic padding based on question count
+        bottom_padding = 0.25 if question_count < 10 else max(0.15, 0.25 - (question_count-10)*0.01)
+        plt.subplots_adjust(bottom=bottom_padding)
+        
+        # Save the figure with even higher DPI for better quality with many questions
         return self._save_figure("factual_correctness_matrix", dpi=300) 
