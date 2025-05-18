@@ -195,63 +195,108 @@ class ChartGenerator:
             logger.warning(f"No data found for metric: {metric_name}")
             return "No data available"
         
-        # Create the figure with white background
-        plt.figure(figsize=(14, 10), facecolor='white')
+        # Close any existing plots and start fresh
+        plt.close('all')
         
-        # Create a bar plot with improved styling
-        # Use a different, darker color palette
-        colors = plt.cm.viridis(np.linspace(0, 0.8, len(df)))
+        # Create a new figure with improved size and white background
+        fig, ax = plt.subplots(figsize=(14, 10), facecolor='white')
         
-        # Create a bar plot
-        ax = sns.barplot(
-            data=df,
-            x='model_name',
-            y='avg_score',
-            palette=colors
+        # Get model names and scores
+        models = df['model_name'].tolist()
+        scores = df['avg_score'].tolist()
+        query_counts = df['query_count'].tolist()
+        
+        # Number of models
+        num_models = len(models)
+        
+        # Define a vibrant color palette - using custom colors for better clarity
+        # Use a more visually appealing blue gradient
+        base_color = '#1f77b4'  # Base blue color
+        colors = []
+        
+        # Define model-specific colors
+        for model in models:
+            if 'claude' in model.lower():
+                colors.append('#ff7f0e')  # Orange for Claude models
+            elif 'gpt' in model.lower() or 'openai' in model.lower():
+                colors.append('#e377c2')  # Pink for GPT/OpenAI models
+            elif 'gemini' in model.lower():
+                colors.append('#2ca02c')  # Green for Gemini models
+            elif 'llama' in model.lower():
+                colors.append('#17becf')  # Teal for Llama models (changed from red)
+            elif 'qwen' in model.lower():
+                colors.append('#9467bd')  # Purple for Qwen models
+            else:
+                colors.append(base_color)  # Default blue for other models
+        
+        # Create x positions
+        x = np.arange(num_models)
+        
+        # Create bars with increased width for better visibility
+        bar_width = 0.7
+        # Create bars with enhanced visual appeal - add gradient effect
+        bars = ax.bar(
+            x, 
+            scores, 
+            width=bar_width, 
+            color=colors, 
+            zorder=5,
+            edgecolor='white',  # White edges for better definition
+            linewidth=0.8,      # Subtle edge lines
+            alpha=0.9           # Slight transparency for better look
         )
         
-        # Add labels and title
+        # Add a light background color for better visual appeal
+        ax.set_facecolor('#f8f9fa')  # Very light gray background
+        
+        # Add labels and title with improved formatting
         formatted_metric = ' '.join(word.capitalize() for word in metric_name.split('_'))
-        plt.title(f'Average {formatted_metric} Score by Model', fontsize=16, fontweight='bold')
-        plt.xlabel('Model', fontsize=14)
-        plt.ylabel(f'Average {formatted_metric}', fontsize=14)
+        ax.set_title(f'Average {formatted_metric} Score by Model', fontsize=20, fontweight='bold')
+        ax.set_xlabel('Model', fontsize=16, fontweight='bold')
+        ax.set_ylabel(f'Average {formatted_metric}', fontsize=16, fontweight='bold')
         
-        # Fix overlapping model names by rotating them vertically and adjusting figure size
-        plt.xticks(rotation=90, ha='center')
+        # Add grid lines behind the bars
+        ax.grid(axis='y', linestyle='-', alpha=0.2, color='gray', zorder=0)
         
-        # Set reasonable y-axis limits
-        max_score = df['avg_score'].max()
-        plt.ylim(0, min(1.0, max_score * 1.2))  # Cap at 1.0 or 20% above max score
+        # Set x-tick positions and labels with proper rotation
+        ax.set_xticks(x)
+        ax.set_xticklabels(models, rotation=45, ha='right', fontsize=13)
         
-        # Add grid for better readability
-        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        # Set y-axis limits for better visualization
+        max_score = max(scores)
+        ax.set_ylim(0, min(1.0, max_score * 1.1))  # Cap at 1.0 or 10% above max score
+        
+        # Improve axis appearance
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)  # Thicker border
+            spine.set_color('#333333')  # Darker border for better definition
         
         # Add data labels on top of bars
-        for p in ax.patches:
-            ax.annotate(f'{p.get_height():.2f}', 
-                      (p.get_x() + p.get_width() / 2., p.get_height()),
-                      ha='center', va='bottom',
-                      fontsize=12, fontweight='bold')
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            ax.annotate(f'{height:.2f}', 
+                      xy=(bar.get_x() + bar.get_width() / 2, height),
+                      xytext=(0, 5),  # 5 points vertical offset for better spacing
+                      textcoords="offset points",
+                       ha='center', va='bottom',
+                       fontsize=13, fontweight='bold', zorder=10,
+                       bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="none", alpha=0.8))  # Add subtle text background
         
-        # Add the number of queries per model at the bottom
-        for i, count in enumerate(df['query_count']):
+        # Add the number of queries per model at the bottom of each bar
+        for i, count in enumerate(query_counts):
             ax.annotate(f'n={count}',
-                      (i, 0.01),
-                      ha='center', va='bottom',
-                      fontsize=10, color='gray')
+                      xy=(x[i], 0.01),
+                       ha='center', va='bottom',
+                       fontsize=11, color='#555555', zorder=10, fontweight='bold')
         
-        # Create shorter model names for the legend by cropping very long names
-        df['short_name'] = df['model_name'].apply(lambda x: 
-            (x[:25] + '...') if len(x) > 28 else x)
-        
-        # Adjust layout to accommodate the rotated x labels
-        plt.tight_layout()
-        
-        # Add padding at the bottom for model names
+        # Add more padding at the bottom for model names
         plt.subplots_adjust(bottom=0.25)
         
+        # Adjust layout
+        fig.tight_layout()
+        
         # Save the figure with higher resolution
-        return self._save_figure(f"model_comparison_{metric_name}", dpi=300)
+        return self._save_figure(f"model_comparison_{metric_name}", fig=fig, dpi=300)
     
     def metric_comparison_chart(self, model_name: str) -> str:
         """
@@ -415,7 +460,7 @@ class ChartGenerator:
         elif model_name.lower().startswith('gemini'):
             model_color = '#2ca02c'  # Green for Gemini models
         elif model_name.lower().startswith('llama'):
-            model_color = '#d62728'  # Red for Llama models
+            model_color = '#17becf'  # Teal for Llama models (changed from red)
         
         # Plot the polygon with higher line width
         ax.plot(angles, values, linewidth=3, linestyle='solid', color=model_color)
@@ -1170,7 +1215,7 @@ class ChartGenerator:
             '#1f77b4',  # Blue (nova-pro-v1)
             '#ff7f0e',  # Orange (claude-3.7-sonnet) 
             '#2ca02c',  # Green (gemini-2.5-flash-preview)
-            '#d62728',  # Red (llama-3.1-8b-instruct)
+            '#17becf',  # Teal (llama-3.1-8b-instruct)
             '#9467bd',  # Purple (llama-3.3-70b-instruct)
             '#8c564b',  # Brown (mistral-8b)
             '#e377c2',  # Pink (gpt-4o-2024-11-20)
