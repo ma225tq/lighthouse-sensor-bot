@@ -39,21 +39,53 @@ Options:
 Examples:
 
 ```bash
-# Generate all chart types
-python backend/app/utils/generate_charts.py
+# 1. Radar Chart (average metric values across all questions)
+python backend/app/utils/generate_charts.py --chart-type ragas-radar-chart
 
-# Generate model comparison chart for a specific metric
+# 2. Comprehensive Charts (all models and metrics except individual models)
+# Comprehensive bar chart of all models and metrics
+python backend/app/utils/generate_charts.py --chart-type all-models-all-metrics
+
+# Heatmap showing average values for all metrics across all questions
+python backend/app/utils/generate_charts.py --chart-type metrics-heatmap
+
+# 3. Model Comparison with RAGAS Metrics (by individual metric)
+# Factual Correctness
+python backend/app/utils/generate_charts.py --chart-type model-comparison --metric factual_correctness
+
+# Semantic Similarity
+python backend/app/utils/generate_charts.py --chart-type model-comparison --metric semantic_similarity
+
+# Faithfulness
+python backend/app/utils/generate_charts.py --chart-type model-comparison --metric faithfulness
+
+# BLEU Score
 python backend/app/utils/generate_charts.py --chart-type model-comparison --metric bleu_score
 
-# Generate radar chart for a specific model
-python backend/app/utils/generate_charts.py --chart-type model-metrics --model "anthropic/claude-3.7-sonnet"
+# ROGUE Score
+python backend/app/utils/generate_charts.py --chart-type model-comparison --metric rogue_score
 
-# Generate a matrix chart showing factual correctness for each question-model pair
-python backend/app/utils/generate_charts.py --chart-type factual-correctness-matrix --max-questions 10 --max-models 6
+# Non LLM String Similarity
+python backend/app/utils/generate_charts.py --chart-type model-comparison --metric non_llm_string_similarity
 
-# Compare two models side by side
-python backend/app/utils/generate_charts.py --chart-type model-vs-model --model1 "qwen/qwen-2.5-72b-instruct" --model2 "openai/gpt-4o-2024-11-20"
+# 4. Claude 3.7 Sonnet vs Open Source Models (side-by-side comparisons)
+# Claude vs Llama 3.3 70B
+python backend/app/utils/generate_charts.py --chart-type model-vs-model --model1 "anthropic/claude-3.7-sonnet" --model2 "meta-llama/llama-3.3-70b-instruct"
+
+# Claude vs Llama 3.1 8B
+python backend/app/utils/generate_charts.py --chart-type model-vs-model --model1 "anthropic/claude-3.7-sonnet" --model2 "meta-llama/llama-3.1-8b-instruct"
+
+# Claude vs Mistral 8B
+python backend/app/utils/generate_charts.py --chart-type model-vs-model --model1 "anthropic/claude-3.7-sonnet" --model2 "mistralai/ministral-8b"
+
+# Claude vs Qwen 2.5 72B
+python backend/app/utils/generate_charts.py --chart-type model-vs-model --model1 "anthropic/claude-3.7-sonnet" --model2 "qwen/qwen-2.5-72b-instruct"
+
+# 5. Factual Correctness Matrix (individual question scores across models)
+python backend/app/utils/generate_charts.py --chart-type factual-correctness-matrix
 ```
+
+All generated charts will be saved to the `output/charts` directory in the project root.
 
 ### API Endpoints
 
@@ -81,7 +113,7 @@ The chart generator is also exposed via REST API endpoints:
 
 5. **Model vs Model Chart**:
    ```
-   GET /api/charts/model-vs-model?model1=qwen/qwen-2.5-72b-instruct&model2=openai/gpt-4o-2024-11-20&metrics=metric1,metric2
+   GET /api/charts/model-vs-model?model1=anthropic/claude-3.7-sonnet&model2=meta-llama/llama-3.3-70b-instruct&metrics=metric1,metric2
    ```
 
 6. **All Models All Metrics Chart**:
@@ -102,7 +134,7 @@ chart_generator = ChartGenerator(output_dir="/path/to/output/dir")
 # Generate a model comparison chart
 chart_path = chart_generator.model_comparison_chart(
     metric_name="factual_correctness",
-    model_names=["qwen/qwen-2.5-72b-instruct", "openai/gpt-4o-2024-11-20"]
+    model_names=["qwen/qwen-2.5-72b-instruct", "anthropic/claude-3.7-sonnet","]
 )
 
 # Generate a radar chart for a specific model. Radar charts for visualizing all metrics for a single model
@@ -127,9 +159,7 @@ The following metrics are available for visualization:
 
 - `factual_correctness` - Measures the factual accuracy of the model's response
 - `semantic_similarity` - Measures how semantically similar the response is to the ground truth
-- `context_recall` - Measures how well the model retrieves relevant context
 - `faithfulness` - Measures how faithful the model is to the retrieved context
 - `bleu_score` - BLEU score for measuring translation quality
 - `non_llm_string_similarity` - String similarity without using LLM
-- `rogue_score` - ROUGE score for measuring summarization quality
-- `string_present` - Checks if specific strings are present in the response 
+- `rogue_score` - ROUGE score for measuring summarization quality 
