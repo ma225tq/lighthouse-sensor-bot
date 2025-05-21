@@ -252,8 +252,14 @@ class ChartGenerator:
         ax.set_facecolor('#f8f9fa')  # Very light gray background
         
         # Add labels and title with improved formatting
-        formatted_metric = ' '.join(word.capitalize() for word in metric_name.split('_'))
-        ax.set_title(f'Average {formatted_metric} Score by Model', fontsize=20, fontweight='bold')
+        formatted_metric = metric_name
+        if metric_name == 'rogue_score':
+            formatted_metric = 'ROUGE Score'
+        elif metric_name == 'bleu_score':
+            formatted_metric = 'BLEU Score'
+        else:
+            formatted_metric = ' '.join(word.capitalize() for word in metric_name.split('_'))
+        ax.set_title(f'Average {formatted_metric} by Model', fontsize=20, fontweight='bold')
         ax.set_xlabel('Model', fontsize=16, fontweight='bold')
         ax.set_ylabel(f'Average {formatted_metric}', fontsize=16, fontweight='bold')
         
