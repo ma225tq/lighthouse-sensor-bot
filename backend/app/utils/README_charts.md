@@ -62,7 +62,7 @@ python backend/app/utils/generate_charts.py --chart-type model-comparison --metr
 # BLEU Score
 python backend/app/utils/generate_charts.py --chart-type model-comparison --metric bleu_score
 
-# ROGUE Score
+# ROUGE Score
 python backend/app/utils/generate_charts.py --chart-type model-comparison --metric rogue_score
 
 # Non LLM String Similarity
@@ -162,4 +162,4 @@ The following metrics are available for visualization:
 - `faithfulness` - Measures how faithful the model is to the retrieved context
 - `bleu_score` - BLEU score for measuring translation quality
 - `non_llm_string_similarity` - String similarity without using LLM
-- `rogue_score` - ROUGE score for measuring summarization quality 
+- `rogue_score` - ROUGE score (Recall-Oriented Understudy for Gisting Evaluation) for measuring summarization quality

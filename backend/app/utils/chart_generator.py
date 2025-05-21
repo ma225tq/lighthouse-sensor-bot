@@ -403,7 +403,7 @@ class ChartGenerator:
         angles += angles[:1]  # Close the polygon
         
         # Format metric names for display
-        metric_labels = [' '.join(word.capitalize() for word in metric.split('_')) for metric in metrics]
+        metric_labels = ['ROUGE Score' if metric == 'rogue_score' else ('BLEU Score' if metric == 'bleu_score' else ' '.join(word.capitalize() for word in metric.split('_'))) for metric in metrics]
         
         # Turn off the default grid
         ax.grid(False)
@@ -637,7 +637,7 @@ class ChartGenerator:
         )
         
         # Format metric names for display
-        formatted_metrics = [' '.join(word.capitalize() for word in metric.split('_')) for metric in metrics]
+        formatted_metrics = ['ROUGE Score' if metric == 'rogue_score' else ('BLEU Score' if metric == 'bleu_score' else ' '.join(word.capitalize() for word in metric.split('_'))) for metric in metrics]
         
         # Add labels and title
         plt.title('Model Performance Across All RAGAS Metrics', fontsize=18, fontweight='bold')
@@ -831,7 +831,7 @@ class ChartGenerator:
         
         # Format metric names for display
         df_melted['Metric'] = df_melted['Metric'].apply(
-            lambda x: ' '.join(word.capitalize() for word in x.split('_'))
+            lambda x: 'ROUGE Score' if x == 'rogue_score' else ('BLEU Score' if x == 'bleu_score' else ' '.join(word.capitalize() for word in x.split('_')))
         )
         
         # Completely fresh approach - use a custom plotting method
@@ -1056,7 +1056,7 @@ class ChartGenerator:
         
         # Format metric names for display
         df_melted['Metric'] = df_melted['Metric'].apply(
-            lambda x: ' '.join(word.capitalize() for word in x.split('_'))
+            lambda x: 'ROUGE Score' if x == 'rogue_score' else ('BLEU Score' if x == 'bleu_score' else ' '.join(word.capitalize() for word in x.split('_')))
         )
         
         # Close any existing figures
@@ -1295,7 +1295,7 @@ class ChartGenerator:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         # Format metric names for display
-        metric_labels = [' '.join(word.capitalize() for word in metric.split('_')) for metric in metrics]
+        metric_labels = ['ROUGE Score' if metric == 'rogue_score' else ('BLEU Score' if metric == 'bleu_score' else ' '.join(word.capitalize() for word in metric.split('_'))) for metric in metrics]
         
         # Create figure with white background and more space for the legend
         fig = plt.figure(figsize=(16, 16), facecolor='white')
