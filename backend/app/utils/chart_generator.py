@@ -276,8 +276,13 @@ class ChartGenerator:
         # Add data labels on top of bars
         for i, bar in enumerate(bars):
             height = bar.get_height()
+            # Ensure non-zero values are visible with a minimum height but label shows actual value
+            display_height = max(0.01, height) if height > 0 else 0
+            if height != display_height:
+                bar.set_height(display_height)
+                
             ax.annotate(f'{height:.2f}', 
-                      xy=(bar.get_x() + bar.get_width() / 2, height),
+                      xy=(bar.get_x() + bar.get_width() / 2, display_height),
                       xytext=(0, 5),  # 5 points vertical offset for better spacing
                       textcoords="offset points",
                        ha='center', va='bottom',
@@ -450,8 +455,20 @@ class ChartGenerator:
         # Process the data for radar chart - handle any missing columns
         values = [df.iloc[0][metric] if metric in df.columns else 0 for metric in metrics]
         
+        # Debug print the actual values before adjustment
+        print(f"\nValues for {model_name} before adjustment:")
+        for m, v in zip(metrics, values):
+            print(f"  - {m}: {v}")
+        
+        # Get original values before min adjustment
+        original_values = values.copy()
+        
+        # Replace very small values with a minimum visible value
+        values = [max(0.01, v) if v > 0 else 0 for v in values]
+        
         # Add values to complete the polygon
         values += values[:1]
+        original_values += original_values[:1]  # Also extend original values
         
         # Choose a vibrant color for the model - match the multi-model chart color for consistency
         model_color = '#1f77b4'  # Blue for nova-pro-v1
@@ -465,7 +482,10 @@ class ChartGenerator:
             model_color = '#17becf'  # Teal for Llama models (changed from red)
         
         # Plot the polygon with higher line width
-        ax.plot(angles, values, linewidth=3, linestyle='solid', color=model_color)
+        ax.plot(angles, values, linewidth=3.5, linestyle='solid', 
+               label=model_name, color=model_color)
+        
+        # Fill with semi-transparent color
         ax.fill(angles, values, alpha=0.25, color=model_color)
         
         # Add data points at each vertex with bigger markers
@@ -480,10 +500,14 @@ class ChartGenerator:
             x_offset = np.cos(angles[i]) * offset
             y_offset = np.sin(angles[i]) * offset
             
-            # Add text with background for better visibility
-            ax.text(angles[i] + x_offset, value + y_offset, f'{value:.2f}', 
-                   fontsize=12, fontweight='bold', ha=ha, va=va,
-                   bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
+            # Add text with background for better visibility - ALWAYS show non-zero values
+            # Use the original value (before min height adjustment) for the label
+            original_value = original_values[i]
+            if original_value > 0:  # Show ALL non-zero values
+                print(f"Adding label for {metrics[i]}: {original_value}")
+                ax.text(angles[i] + x_offset, value + y_offset, f'{original_value:.2f}', 
+                       fontsize=12, fontweight='bold', ha=ha, va=va,
+                       bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
         
         # Add title
         plt.title(f'Metrics Radar Chart for {model_name} (n={query_count})', fontsize=18, fontweight='bold', y=1.05)
@@ -591,6 +615,11 @@ class ChartGenerator:
         # Ensure all data is numeric
         df = df.astype(float)
         
+        # Ensure very small values are preserved by setting a minimum display value
+        for col in df.columns:
+            # Replace extremely small values (but > 0) with a minimum visible value
+            df[col] = df[col].apply(lambda x: max(0.001, x) if x > 0 else 0)
+        
         # Create figure with white background for better visibility
         plt.figure(figsize=(14, 10), facecolor='white')
         
@@ -693,8 +722,14 @@ class ChartGenerator:
         
         # Add data labels
         for p in ax.patches:
-            ax.annotate(f'{p.get_width():.2f}', 
-                      (p.get_width(), p.get_y() + p.get_height() / 2),
+            width = p.get_width()
+            # Ensure non-zero values are visible with a minimum width but label shows actual value
+            display_width = max(0.01, width) if width > 0 else 0
+            if width != display_width:
+                p.set_width(display_width)
+                
+            ax.annotate(f'{width:.2f}', 
+                      (display_width, p.get_y() + p.get_height() / 2),
                       ha='left', va='center',
                       fontsize=10, xytext=(5, 0),
                       textcoords='offset points')
@@ -819,8 +854,11 @@ class ChartGenerator:
         width = 0.35  # Width of the bars
         x = np.arange(num_metrics)  # Metric positions on x-axis
         
+        # Make sure models are in the correct order (model1 should be first)
+        ordered_models = [model1, model2]
+        
         # Custom bar plot to replace seaborn's barplot
-        for i, model in enumerate(models):
+        for i, model in enumerate(ordered_models):
             model_data = df_melted[df_melted['model_name'] == model]
             
             # Get scores for each metric
@@ -834,8 +872,13 @@ class ChartGenerator:
             # Add text annotations for each bar
             for j, bar in enumerate(bars):
                 height = bar.get_height()
+                # Ensure non-zero values are visible with a minimum height but label shows actual value
+                display_height = max(0.01, height) if height > 0 else 0
+                if height != display_height:
+                    bar.set_height(display_height)
+                
                 ax.annotate(f'{height:.2f}',
-                          xy=(bar.get_x() + bar.get_width() / 2, height),
+                          xy=(bar.get_x() + bar.get_width() / 2, display_height),
                           xytext=(0, 3),  # 3 points vertical offset
                           textcoords="offset points",
                           ha='center', va='bottom',
@@ -989,6 +1032,18 @@ class ChartGenerator:
         for col in metrics:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                
+        # Print the Bleu Score values to debug
+        if 'bleu_score' in df.columns:
+            print("\nBleu Score values by model:")
+            for model, score in zip(df['model_name'], df['bleu_score']):
+                print(f"  - {model}: {score}")
+                
+        # Ensure very small values are preserved with a minimum display value
+        for col in metrics:
+            if col in df.columns:
+                # Replace extremely small values (but > 0) with a minimum visible value
+                df[col] = df[col].apply(lambda x: max(0.001, x) if x > 0 else 0)
         
         # Reshape data for grouped bar chart
         df_melted = pd.melt(
@@ -1016,28 +1071,44 @@ class ChartGenerator:
         # Base height plus additional height for more models
         height = max(10, 6 + model_count * 0.8)
         
-        # Adjust cell size as question count increases
-        cell_size_factor = 1.0 if len(metrics) <= 8 else (1.0 - min(0.4, (len(metrics) - 8) * 0.025))
+        # Create figure with white background
+        fig, ax = plt.subplots(figsize=(width, height), facecolor='white', dpi=150)
         
-        # Calculate appropriate figure sizes and spacing
-        # Add just enough extra space for legend and note
-        height_with_legend = height + 0.8  # Reduced extra space (was 1.5)
+        # Create a vibrant and diverse color palette for better distinction between metrics
+        # Define the number of distinct colors needed (one per metric)
+        n_colors = len(metrics)
         
-        # Set up the figure with a high-resolution DPI for better scaling and extra height
-        plt.figure(figsize=(width * cell_size_factor, height_with_legend), facecolor='white', dpi=150)
+        # Create a vibrant and diverse color palette instead of just blues
+        # This palette provides better distinction between metrics
+        vibrant_colors = [
+            "#3498db",  # Blue
+            "#e74c3c",  # Red
+            "#2ecc71",  # Green
+            "#9b59b6",  # Purple
+            "#f39c12",  # Orange
+            "#1abc9c",  # Turquoise
+            "#d35400",  # Dark Orange
+            "#34495e",  # Navy Blue
+            "#16a085",  # Teal
+            "#c0392b",  # Dark Red
+            "#8e44ad",  # Violet
+            "#27ae60"   # Emerald
+        ]
         
-        # Create a custom colormap that transitions from white to lighter blues
-        # Much lighter colors for better text visibility
-        colors = ["#ffffff", "#f0f8ff", "#e6f2ff", "#ccdfff", "#b3d1ff", "#80b3ff", "#4d94ff", "#1a75ff"]
-        custom_cmap = LinearSegmentedColormap.from_list("app_blues", colors)
+        # Extend the palette if we have more metrics than colors
+        if n_colors > len(vibrant_colors):
+            vibrant_colors = vibrant_colors * (n_colors // len(vibrant_colors) + 1)
         
-        # Create the heatmap with appropriate cell sizes
+        # Use only as many colors as needed
+        custom_colors = vibrant_colors[:n_colors]
+        
+        # Create grouped bar chart with custom colors
         ax = sns.barplot(
             data=df_melted,
             x='model_name',
             y='Score',
             hue='Metric',
-            palette=custom_cmap,
+            palette=custom_colors,
             saturation=0.95,
             dodge=True,
             alpha=0.9
@@ -1072,48 +1143,54 @@ class ChartGenerator:
                       bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="none", alpha=0.8))
         
         # Add legend with improved formatting
-        legend_handles = []
-        legend_labels = []
-        
-        # Create custom color squares for the legend with the new color scheme
-        legend_colors = [
-            (custom_cmap(0.1), '0.0 - 0.2'),
-            (custom_cmap(0.3), '0.2 - 0.4'),
-            (custom_cmap(0.5), '0.4 - 0.6'),
-            (custom_cmap(0.7), '0.6 - 0.8'),
-            (custom_cmap(0.9), '0.8 - 1.0')
-        ]
-        
-        for color, label in legend_colors:
-            legend_handles.append(plt.Rectangle((0, 0), 1, 1, color=color))
-            legend_labels.append(label)
-        
-        # Use tight_layout first to organize the main content
-        plt.tight_layout()
-        
-        # Minimal bottom margin - just enough for legend and note
-        plt.subplots_adjust(bottom=0.08)  # Reduced from 0.15
-        
-        # Create the legend in a fixed position at the bottom of the figure
-        plt.figlegend(
-            legend_handles, 
-            legend_labels,
-            title="Legend",
-            loc='lower center',
-            bbox_to_anchor=(0.5, 0.06),  # Position closer to the chart
-            ncol=min(len(legend_colors), 5),  # Ensure the legend isn't too wide
+        legend = plt.legend(
+            title='Metrics', 
+            bbox_to_anchor=(1.02, 1),  # Position outside the plot
+            loc='upper left',
             frameon=True,
-            fontsize=10
+            fontsize=11,
+            title_fontsize=14,
+            framealpha=0.95,
+            edgecolor='#cccccc'
         )
         
-        # Add explanatory note below the legend
-        plt.figtext(
-            0.5, 0.01,  # Position below the legend
-            "Note: Values represent the average factual correctness score across multiple evaluations of each question-model pair",
-            ha='center', fontsize=9, fontstyle='italic'
-        )
+        # Add grid for better readability
+        plt.grid(axis='y', linestyle='--', alpha=0.3, zorder=0)
         
-        # Save the figure with even higher DPI for better quality with many questions
+        # Ensure all bars are visible by adjusting y-axis to start at 0
+        # Add 10% padding at the top for labels
+        max_score = df_melted['Score'].max()
+        ax.set_ylim(0, min(1.0, max_score * 1.15))
+        
+        # Add value labels on top of each bar with improved formatting
+        for p in ax.patches:
+            height = p.get_height()
+            # Set minimum display height for very small values but keep actual data value
+            display_height = max(0.01, height) if height > 0 else 0
+            p.set_height(display_height)
+            
+            # Only label bars with significant height
+            if height > 0:  # Label all non-zero values
+                ax.annotate(
+                    f'{height:.2f}', 
+                    xy=(p.get_x() + p.get_width() / 2, display_height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom',
+                    fontsize=9, fontweight='bold',
+                    color='#333333',
+                    bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.8)
+                )
+        
+        # Add border around the plot for better definition
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+            spine.set_color('#333333')
+        
+        # Adjust layout
+        plt.tight_layout(rect=[0, 0.05, 0.85, 0.98])
+        
+        # Save the figure with high DPI for quality
         return self._save_figure("all_models_all_metrics", fig=fig, dpi=300)
         
     def ragas_radar_chart(self) -> str:
@@ -1295,9 +1372,20 @@ class ChartGenerator:
             model_name = row['model_name']
             color = model_color_map[model_name]
             
+            # Debug print the values for this model
+            print(f"\nValues for {model_name}:")
+            for m, v in zip(metrics, [row[metric] if metric in row.index and pd.notna(row[metric]) else 0 for metric in metrics]):
+                print(f"  - {m}: {v}")
+                
             # Get values for each metric, handling missing metrics
-            values = [row[metric] if metric in row.index and pd.notna(row[metric]) else 0 for metric in metrics]
+            original_values = [row[metric] if metric in row.index and pd.notna(row[metric]) else 0 for metric in metrics]
+            values = original_values.copy()
+            
+            # Replace very small values with a minimum visible value for better display
+            values = [max(0.01, v) if v > 0 else 0 for v in values]
+            
             values += values[:1]  # Close the polygon
+            original_values += original_values[:1]  # Also extend original values
             
             # Plot the model's polygon with higher line width for better visibility
             ax.plot(angles, values, linewidth=3.5, linestyle='solid', 
@@ -1312,7 +1400,9 @@ class ChartGenerator:
                           edgecolor='black', linewidth=1.5, zorder=10)
                 
                 # Add value labels at each point for better readability
-                if value > 0.05:  # Only show values that are significant
+                # Always show labels for ALL non-zero values
+                original_value = original_values[j]
+                if original_value > 0:  # Show ALL non-zero values, not just those > 0.05
                     ha = 'left' if angles[j] > np.pi else 'right'
                     va = 'bottom' if angles[j] < np.pi/2 or angles[j] > 3*np.pi/2 else 'top'
                     
@@ -1322,7 +1412,7 @@ class ChartGenerator:
                     y_offset = np.sin(angles[j]) * offset
                     
                     # Add text with background for better visibility
-                    ax.text(angles[j] + x_offset, value + y_offset, f'{value:.2f}', 
+                    ax.text(angles[j] + x_offset, value + y_offset, f'{original_value:.2f}', 
                            fontsize=10, fontweight='bold', ha=ha, va=va,
                            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
         
@@ -1541,24 +1631,24 @@ class ChartGenerator:
         # Use tight_layout first to organize the main content
         plt.tight_layout()
         
-        # Minimal bottom margin - just enough for legend and note
-        plt.subplots_adjust(bottom=0.08)
+        # Reduce bottom margin to bring the legend closer to the questions
+        plt.subplots_adjust(bottom=0.15)  # Increased from 0.08 to reduce distance
         
-        # Create the legend in a fixed position at the bottom of the figure
+        # Create the legend in a fixed position closer to the chart
         plt.figlegend(
             legend_handles, 
             legend_labels,
             title="Legend",
             loc='lower center',
-            bbox_to_anchor=(0.5, 0.06),  # Position closer to the chart
+            bbox_to_anchor=(0.5, 0.03),  # Adjusted from 0.06 to move legend up closer to chart
             ncol=min(len(legend_colors), 5),  # Ensure the legend isn't too wide
             frameon=True,
             fontsize=10
         )
         
-        # Add explanatory note below the legend
+        # Add explanatory note below the legend but closer to it
         plt.figtext(
-            0.5, 0.01,  # Position below the legend
+            0.5, 0.005,  # Position closer to the legend (changed from 0.01)
             "Note: Values represent the average factual correctness score across multiple evaluations of each question-model pair",
             ha='center', fontsize=9, fontstyle='italic'
         )
