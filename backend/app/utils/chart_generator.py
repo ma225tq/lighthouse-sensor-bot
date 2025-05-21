@@ -1016,47 +1016,28 @@ class ChartGenerator:
         # Base height plus additional height for more models
         height = max(10, 6 + model_count * 0.8)
         
-        # Create figure with white background
-        fig, ax = plt.subplots(figsize=(width, height), facecolor='white', dpi=150)
+        # Adjust cell size as question count increases
+        cell_size_factor = 1.0 if len(metrics) <= 8 else (1.0 - min(0.4, (len(metrics) - 8) * 0.025))
         
-        # Create custom blue color palette that matches the application theme
-        # Using colors from light to dark blue for better distinction
-        from matplotlib.colors import LinearSegmentedColormap
+        # Calculate appropriate figure sizes and spacing
+        # Add just enough extra space for legend and note
+        height_with_legend = height + 0.8  # Reduced extra space (was 1.5)
         
-        # Define the number of distinct colors needed (one per metric)
-        n_colors = len(metrics)
+        # Set up the figure with a high-resolution DPI for better scaling and extra height
+        plt.figure(figsize=(width * cell_size_factor, height_with_legend), facecolor='white', dpi=150)
         
-        # Create a vibrant and diverse color palette instead of just blues
-        # This palette provides better distinction between metrics
-        vibrant_colors = [
-            "#3498db",  # Blue
-            "#e74c3c",  # Red
-            "#2ecc71",  # Green
-            "#9b59b6",  # Purple
-            "#f39c12",  # Orange
-            "#1abc9c",  # Turquoise
-            "#d35400",  # Dark Orange
-            "#34495e",  # Navy Blue
-            "#16a085",  # Teal
-            "#c0392b",  # Dark Red
-            "#8e44ad",  # Violet
-            "#27ae60"   # Emerald
-        ]
+        # Create a custom colormap that transitions from white to lighter blues
+        # Much lighter colors for better text visibility
+        colors = ["#ffffff", "#f0f8ff", "#e6f2ff", "#ccdfff", "#b3d1ff", "#80b3ff", "#4d94ff", "#1a75ff"]
+        custom_cmap = LinearSegmentedColormap.from_list("app_blues", colors)
         
-        # Extend the palette if we have more metrics than colors
-        if n_colors > len(vibrant_colors):
-            vibrant_colors = vibrant_colors * (n_colors // len(vibrant_colors) + 1)
-        
-        # Use only as many colors as needed
-        custom_colors = vibrant_colors[:n_colors]
-        
-        # Create grouped bar chart with custom colors
+        # Create the heatmap with appropriate cell sizes
         ax = sns.barplot(
             data=df_melted,
             x='model_name',
             y='Score',
             hue='Metric',
-            palette=custom_colors,
+            palette=custom_cmap,
             saturation=0.95,
             dodge=True,
             alpha=0.9
@@ -1091,49 +1072,48 @@ class ChartGenerator:
                       bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="none", alpha=0.8))
         
         # Add legend with improved formatting
-        legend = plt.legend(
-            title='Metrics', 
-            bbox_to_anchor=(1.02, 1),  # Position outside the plot
-            loc='upper left',
+        legend_handles = []
+        legend_labels = []
+        
+        # Create custom color squares for the legend with the new color scheme
+        legend_colors = [
+            (custom_cmap(0.1), '0.0 - 0.2'),
+            (custom_cmap(0.3), '0.2 - 0.4'),
+            (custom_cmap(0.5), '0.4 - 0.6'),
+            (custom_cmap(0.7), '0.6 - 0.8'),
+            (custom_cmap(0.9), '0.8 - 1.0')
+        ]
+        
+        for color, label in legend_colors:
+            legend_handles.append(plt.Rectangle((0, 0), 1, 1, color=color))
+            legend_labels.append(label)
+        
+        # Use tight_layout first to organize the main content
+        plt.tight_layout()
+        
+        # Minimal bottom margin - just enough for legend and note
+        plt.subplots_adjust(bottom=0.08)  # Reduced from 0.15
+        
+        # Create the legend in a fixed position at the bottom of the figure
+        plt.figlegend(
+            legend_handles, 
+            legend_labels,
+            title="Legend",
+            loc='lower center',
+            bbox_to_anchor=(0.5, 0.06),  # Position closer to the chart
+            ncol=min(len(legend_colors), 5),  # Ensure the legend isn't too wide
             frameon=True,
-            fontsize=11,
-            title_fontsize=14,
-            framealpha=0.95,
-            edgecolor='#cccccc'
+            fontsize=10
         )
         
-        # Add grid for better readability
-        plt.grid(axis='y', linestyle='--', alpha=0.3, zorder=0)
+        # Add explanatory note below the legend
+        plt.figtext(
+            0.5, 0.01,  # Position below the legend
+            "Note: Values represent the average factual correctness score across multiple evaluations of each question-model pair",
+            ha='center', fontsize=9, fontstyle='italic'
+        )
         
-        # Ensure all bars are visible by adjusting y-axis to start at 0
-        # Add 10% padding at the top for labels
-        max_score = df_melted['Score'].max()
-        ax.set_ylim(0, min(1.0, max_score * 1.15))
-        
-        # Add value labels on top of each bar with improved formatting
-        for p in ax.patches:
-            height = p.get_height()
-            if height > 0.05:  # Only label bars with significant height
-                ax.annotate(
-                    f'{height:.2f}', 
-                    xy=(p.get_x() + p.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
-                    textcoords="offset points",
-                    ha='center', va='bottom',
-                    fontsize=9, fontweight='bold',
-                    color='#333333',
-                    bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.8)
-                )
-        
-        # Add border around the plot for better definition
-        for spine in ax.spines.values():
-            spine.set_linewidth(1.5)
-            spine.set_color('#333333')
-        
-        # Adjust layout
-        plt.tight_layout(rect=[0, 0.05, 0.85, 0.98])
-        
-        # Save the figure with high DPI for quality
+        # Save the figure with even higher DPI for better quality with many questions
         return self._save_figure("all_models_all_metrics", fig=fig, dpi=300)
         
     def ragas_radar_chart(self) -> str:
@@ -1493,23 +1473,23 @@ class ChartGenerator:
         # Adjust cell size as question count increases
         cell_size_factor = 1.0 if question_count <= 8 else (1.0 - min(0.4, (question_count - 8) * 0.025))
         
-        # Set up the figure with a high-resolution DPI for better scaling
-        plt.figure(figsize=(width * cell_size_factor, height), facecolor='white', dpi=150)
+        # Calculate appropriate figure sizes and spacing
+        # Add just enough extra space for legend and note
+        height_with_legend = height + 0.8  # Reduced extra space (was 1.5)
         
-        # Create the heatmap with a color gradient
-        # Replace RdYlGn with a custom color scheme that matches the application theme
-        from matplotlib.colors import LinearSegmentedColormap
+        # Set up the figure with a high-resolution DPI for better scaling and extra height
+        plt.figure(figsize=(width * cell_size_factor, height_with_legend), facecolor='white', dpi=150)
         
-        # Create a custom colormap that transitions from light blue to dark blue
-        # This matches the application's blue theme better than the red-yellow-green
-        colors = ["#ffffff", "#d4e6f1", "#a9cce3", "#7fb3d5", "#5499c7", "#2980b9", "#1f618d", "#154360"]
+        # Create a custom colormap that transitions from white to lighter blues
+        # Much lighter colors for better text visibility
+        colors = ["#ffffff", "#f0f8ff", "#e6f2ff", "#ccdfff", "#b3d1ff", "#80b3ff", "#4d94ff", "#1a75ff"]
         custom_cmap = LinearSegmentedColormap.from_list("app_blues", colors)
         
         # Create the heatmap with appropriate cell sizes
         ax = sns.heatmap(
             matrix_df,
             annot=True,
-            cmap=custom_cmap,  # Custom blue colormap
+            cmap=custom_cmap,  # Much lighter custom blue colormap
             vmin=0,
             vmax=1,
             linewidths=max(0.5, 1.0 * cell_size_factor),  # Thinner lines for more cells
@@ -1518,8 +1498,7 @@ class ChartGenerator:
             annot_kws={"color": "black", 
                       "fontweight": "bold",
                       "fontsize": max(8, 10 * cell_size_factor)},  # Smaller text for more cells
-            cbar_kws={'label': 'Factual Correctness Score',
-                     'shrink': min(1.0, 0.8 + 0.2 * cell_size_factor)}  # Adjust colorbar size
+            cbar=False  # Remove the colorbar completely
         )
         
         # Ensure square cells for better appearance
@@ -1559,26 +1538,30 @@ class ChartGenerator:
             legend_handles.append(plt.Rectangle((0, 0), 1, 1, color=color))
             legend_labels.append(label)
         
-        # Position the legend - adjust for question count
-        legend_position = -0.12 if question_count < 10 else -0.08  # Less bottom padding for more questions
+        # Use tight_layout first to organize the main content
+        plt.tight_layout()
         
-        # Position the legend below the matrix
-        legend = plt.legend(
+        # Minimal bottom margin - just enough for legend and note
+        plt.subplots_adjust(bottom=0.08)
+        
+        # Create the legend in a fixed position at the bottom of the figure
+        plt.figlegend(
             legend_handles, 
             legend_labels,
             title="Legend",
-            loc='upper center',
-            bbox_to_anchor=(0.5, legend_position),
+            loc='lower center',
+            bbox_to_anchor=(0.5, 0.06),  # Position closer to the chart
             ncol=min(len(legend_colors), 5),  # Ensure the legend isn't too wide
-            frameon=True
+            frameon=True,
+            fontsize=10
         )
         
-        # Adjust layout to make room for the legend and note
-        plt.tight_layout()
-        
-        # Dynamic padding based on question count
-        bottom_padding = 0.25 if question_count < 10 else max(0.15, 0.25 - (question_count-10)*0.01)
-        plt.subplots_adjust(bottom=bottom_padding)
+        # Add explanatory note below the legend
+        plt.figtext(
+            0.5, 0.01,  # Position below the legend
+            "Note: Values represent the average factual correctness score across multiple evaluations of each question-model pair",
+            ha='center', fontsize=9, fontstyle='italic'
+        )
         
         # Save the figure with even higher DPI for better quality with many questions
         return self._save_figure("factual_correctness_matrix", dpi=300) 

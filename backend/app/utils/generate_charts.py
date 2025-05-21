@@ -84,14 +84,14 @@ def main():
     parser.add_argument(
         "--limit",
         type=int,
-        default=10,
+        default=20,
         help="Maximum number of queries for query-performance chart"
     )
     
     parser.add_argument(
         "--max-questions",
         type=int,
-        default=8,
+        default=20,
         help="Maximum number of questions for factual-correctness-matrix chart"
     )
     
