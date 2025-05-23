@@ -19,6 +19,7 @@ Options:
     --max-questions Maximum number of questions for factual-correctness-matrix chart
     --max-models    Maximum number of models for factual-correctness-matrix chart
     --output        Output directory (default: project_root/output/charts)
+    --pdf-only      Generate only PDF files (skip PNG generation)
 """
 
 import argparse
@@ -52,7 +53,7 @@ def main():
             "query-performance", 
             "model-vs-model", 
             "all-models-all-metrics",
-            "ragas-radar-chart",
+            "enhanced-metrics-radar-chart",
             "factual-correctness-matrix",
             "all"
         ],
@@ -107,10 +108,16 @@ def main():
         help="Output directory"
     )
     
+    parser.add_argument(
+        "--pdf-only",
+        action="store_true",
+        help="Generate only PDF files (skip PNG generation)"
+    )
+    
     args = parser.parse_args()
     
     # Create chart generator
-    chart_generator = ChartGenerator(output_dir=args.output)
+    chart_generator = ChartGenerator(output_dir=args.output, pdf_only=args.pdf_only)
     
     # Generate requested charts
     if args.chart_type in ["model-comparison", "all"]:
@@ -159,9 +166,9 @@ def main():
         path = chart_generator.all_models_all_metrics()
         print(f"Chart saved: {path}")
         
-    if args.chart_type in ["ragas-radar-chart", "all"]:
-        print("Generating optimized RAGAS radar chart with all models and metrics...")
-        path = chart_generator.ragas_radar_chart()
+    if args.chart_type in ["enhanced-metrics-radar-chart", "all"]:
+        print("Generating optimized metrics radar chart with all models and metrics...")
+        path = chart_generator.enhanced_metrics_radar_chart()
         print(f"Chart saved: {path}")
         
     if args.chart_type in ["factual-correctness-matrix", "all"]:

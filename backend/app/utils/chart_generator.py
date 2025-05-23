@@ -56,12 +56,13 @@ class ChartGenerator:
     These charts can be used for thesis or presentation purposes.
     """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, pdf_only: bool = False):
         """
         Initialize the chart generator.
         
         Args:
             output_dir: Directory to save charts to. Defaults to 'output/charts' in the project root.
+            pdf_only: If True, generate only PDF files (skip PNG generation)
         """
         if output_dir is None:
             # Get the project root directory
@@ -69,7 +70,9 @@ class ChartGenerator:
             self.output_dir = project_root / "output" / "charts"
         else:
             self.output_dir = Path(output_dir)
-            
+        
+        self.pdf_only = pdf_only
+        
         # Create the output directory if it doesn't exist
         os.makedirs(self.output_dir, exist_ok=True)
         
@@ -111,7 +114,7 @@ class ChartGenerator:
             logger.error(f"Error fetching data: {e}")
             raise
     
-    def _save_figure(self, filename: str, fig: plt.Figure = None, dpi=300) -> str:
+    def _save_figure(self, filename: str, fig: plt.Figure = None, dpi=300, save_pdf=True, pdf_only=False) -> str:
         """
         Save the current figure or a provided figure to the output directory.
         
@@ -119,19 +122,40 @@ class ChartGenerator:
             filename: Filename for the saved chart (without extension)
             fig: Figure to save, if None the current figure is saved
             dpi: Resolution for the saved image
+            save_pdf: Whether to also save as PDF
+            pdf_only: If True, only save PDF and skip PNG generation
             
         Returns:
-            Path to the saved file
+            Path to the saved PNG or PDF file
         """
-        file_path = self.output_dir / f"{filename}.png"
-        
-        if fig:
-            fig.savefig(file_path, dpi=dpi, bbox_inches='tight')
-        else:
-            plt.savefig(file_path, dpi=dpi, bbox_inches='tight')
+        if pdf_only and save_pdf:
+            # Save only PDF
+            pdf_path = self.output_dir / f"{filename}.pdf"
             
-        plt.close()
-        return str(file_path)
+            if fig:
+                fig.savefig(pdf_path, format='pdf', bbox_inches='tight')
+            else:
+                plt.savefig(pdf_path, format='pdf', bbox_inches='tight')
+                
+            plt.close()
+            return str(pdf_path)
+        else:
+            # Save PNG (and optionally PDF)
+            png_path = self.output_dir / f"{filename}.png"
+            
+            if fig:
+                fig.savefig(png_path, dpi=dpi, bbox_inches='tight')
+                if save_pdf:
+                    pdf_path = self.output_dir / f"{filename}.pdf"
+                    fig.savefig(pdf_path, format='pdf', bbox_inches='tight')
+            else:
+                plt.savefig(png_path, dpi=dpi, bbox_inches='tight')
+                if save_pdf:
+                    pdf_path = self.output_dir / f"{filename}.pdf"
+                    plt.savefig(pdf_path, format='pdf', bbox_inches='tight')
+                
+            plt.close()
+            return str(png_path)
     
     def _sanitize_filename(self, filename: str) -> str:
         """
@@ -150,6 +174,32 @@ class ChartGenerator:
         sanitized = sanitized.replace('<', '_').replace('>', '_')
         sanitized = sanitized.replace('|', '_').replace(' ', '_')
         return sanitized
+    
+    def _shorten_model_name(self, model_name: str) -> str:
+        """
+        Convert long model names to shorter display names.
+        
+        Args:
+            model_name: Original model name
+            
+        Returns:
+            Shortened model name
+        """
+        # Define mappings for common model names
+        name_mappings = {
+            'anthropic/claude-3.7-sonnet': 'Claude 3.7 Sonnet',
+            'meta-llama/llama-3.3-70b-instruct': 'Llama 3.3 70B', 
+            'meta-llama/llama-3.1-8b-instruct': 'Llama 3.1 8B',
+            'qwen/qwen-2.5-72b-instruct': 'Qwen 2.5 72B',
+            'mistralai/ministral-8b': 'Ministral 8B',
+            'openai/gpt-4o-2024-11-20': 'GPT-4o',
+            'google/gemini-2.5-flash-preview': 'Gemini 2.5 Flash',
+            'nvidia/llama-3.1-nemotron-70b-instruct': 'Nemotron 70B',
+            'nousresearch/hermes-3-llama-3.1-70b': 'Hermes 3 70B'
+        }
+        
+        # Return mapped name if available, otherwise return original
+        return name_mappings.get(model_name, model_name)
     
     def model_comparison_chart(self, 
                               metric_name: str = 'factual_correctness',
@@ -196,6 +246,9 @@ class ChartGenerator:
         if df.empty:
             logger.warning(f"No data found for metric: {metric_name}")
             return "No data available"
+        
+        # Apply model name shortening
+        df['model_name'] = df['model_name'].apply(self._shorten_model_name)
         
         # Close any existing plots and start fresh
         plt.close('all')
@@ -309,7 +362,7 @@ class ChartGenerator:
         fig.tight_layout()
         
         # Save the figure with higher resolution
-        return self._save_figure(f"model_comparison_{metric_name}", fig=fig, dpi=300)
+        return self._save_figure(f"model_comparison_{metric_name}", fig=fig, dpi=300, pdf_only=self.pdf_only)
     
     def metric_comparison_chart(self, model_name: str) -> str:
         """
@@ -448,7 +501,7 @@ class ChartGenerator:
             
             # Save the figure with sanitized filename
             safe_model_name = self._sanitize_filename(model_name)
-            return self._save_figure(f"radar_chart_{safe_model_name}_no_data", dpi=300)
+            return self._save_figure(f"radar_chart_{safe_model_name}_no_data", dpi=300, pdf_only=self.pdf_only)
         
         # Get the query count
         query_count = int(df['query_count'].iloc[0])
@@ -523,7 +576,7 @@ class ChartGenerator:
         
         # Save the figure with sanitized filename
         safe_model_name = self._sanitize_filename(model_name)
-        return self._save_figure(f"radar_chart_{safe_model_name}", dpi=300)
+        return self._save_figure(f"radar_chart_{safe_model_name}", dpi=300, pdf_only=self.pdf_only)
     
     def metrics_heatmap(self, 
                        model_names: List[str] = None,
@@ -615,6 +668,9 @@ class ChartGenerator:
             logger.warning("No data found for heatmap")
             return "No data available"
         
+        # Apply model name shortening before setting as index
+        df['model_name'] = df['model_name'].apply(self._shorten_model_name)
+        
         # Set model name as index
         df = df.set_index('model_name')
         
@@ -626,41 +682,62 @@ class ChartGenerator:
             # Replace extremely small values (but > 0) with a minimum visible value
             df[col] = df[col].apply(lambda x: max(0.001, x) if x > 0 else 0)
         
-        # Create figure with white background for better visibility
-        plt.figure(figsize=(14, 10), facecolor='white')
+        # Create figure with enhanced size and white background for better visibility
+        model_count = len(df.index)
+        metric_count = len(df.columns)
         
-        # Generate heatmap with improved styling
+        # Enhanced figure sizing for better readability
+        width = max(16, 12 + 1.0 * metric_count)  # Increased width scaling
+        height = max(12, 8 + 1.5 * model_count)   # Significantly increased height for better spacing
+        
+        plt.figure(figsize=(width, height), facecolor='white', dpi=250)  # Higher DPI for better quality
+        
+        # Create custom light green colormap for good visibility and differentiation from other charts
+        light_colors = ["#ffffff", "#f0fff0", "#e8f5e8", "#d4f1d4", "#b8e6b8", "#90d190", "#6bb66b", "#4caf50"]
+        custom_light_cmap = LinearSegmentedColormap.from_list("light_greens", light_colors)
+        
+        # Generate heatmap with enhanced styling and lighter colors for better text visibility
         ax = sns.heatmap(
             df,
             annot=True,
-            cmap="YlGnBu",
+            cmap=custom_light_cmap,  # Custom light green colormap for excellent text visibility
             fmt=".2f",
-            linewidths=.5,
+            linewidths=1.5,  # Thicker lines for better separation
             vmin=0,
             vmax=1,
             square=True,
-            cbar_kws={'label': 'Score'}
+            cbar_kws={'label': 'Score', 'shrink': 0.8},  # Better colorbar sizing
+            annot_kws={"fontsize": 22, "fontweight": "bold", "color": "black"}  # Large text for maximum visibility
         )
+        
+        # Enhance colorbar text size
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=16)  # Bigger colorbar tick labels
+        cbar.set_label('Score', fontsize=18, fontweight='bold')  # Bigger colorbar label
         
         # Format metric names for display
         formatted_metrics = ['ROUGE Score' if metric == 'rogue_score' else ('BLEU Score' if metric == 'bleu_score' else ' '.join(word.capitalize() for word in metric.split('_'))) for metric in metrics]
         
-        # Add labels and title
-        plt.title('Model Performance Across All RAGAS Metrics', fontsize=18, fontweight='bold')
-        plt.xlabel('Metrics', fontsize=14)
-        plt.ylabel('Models', fontsize=14)
+        # Enhanced labels and title with better spacing
+        plt.title('Model Performance Across All Metrics', fontsize=24, fontweight='bold', pad=30)  # Even larger title
+        plt.xlabel('Metrics', fontsize=20, fontweight='bold', labelpad=18)  # Larger font with padding
+        plt.ylabel('Models', fontsize=20, fontweight='bold', labelpad=25)   # Larger font with more padding
         
-        # Set x-axis labels to formatted metrics
-        ax.set_xticklabels(formatted_metrics, rotation=45, ha='right', fontsize=11)
+        # Set x-axis labels with better formatting and spacing
+        ax.set_xticklabels(formatted_metrics, rotation=45, ha='right', fontsize=16, fontweight='bold')  # Larger font
         
-        # Set y-axis labels (model names) with larger font
-        ax.set_yticklabels(ax.get_yticklabels(), fontsize=11)
+        # Set y-axis labels (model names) with enhanced spacing and larger font
+        ax.set_yticklabels(ax.get_yticklabels(), fontsize=17, fontweight='bold', rotation=0)  # Larger font
         
-        # Adjust layout for better display
+        # Add extra spacing around the heatmap
+        ax.tick_params(axis='y', pad=10)  # Add padding between y-axis labels and heatmap
+        ax.tick_params(axis='x', pad=8)   # Add padding between x-axis labels and heatmap
+        
+        # Adjust layout for optimal spacing
         plt.tight_layout()
         
-        # Save the figure with higher DPI
-        return self._save_figure("metrics_heatmap", dpi=300)
+        # Save the figure with high DPI for better quality
+        return self._save_figure("metrics_heatmap", dpi=300, pdf_only=self.pdf_only)
     
     def query_performance_chart(self, 
                               model_name: str,
@@ -745,7 +822,7 @@ class ChartGenerator:
         
         # Save the figure with sanitized filename
         safe_model_name = self._sanitize_filename(model_name)
-        return self._save_figure(f"query_performance_{safe_model_name}_{metric_name}")
+        return self._save_figure(f"query_performance_{safe_model_name}_{metric_name}", pdf_only=self.pdf_only)
     
     def model_vs_model_chart(self,
                            model1: str,
@@ -916,11 +993,11 @@ class ChartGenerator:
         safe_model2 = self._sanitize_filename(model2)
         
         # Save the figure with the custom plotting approach
-        return self._save_figure(f"model_comparison_{safe_model1}_vs_{safe_model2}", fig=fig, dpi=300)
+        return self._save_figure(f"model_comparison_{safe_model1}_vs_{safe_model2}", fig=fig, dpi=300, pdf_only=self.pdf_only)
 
     def all_models_all_metrics(self) -> str:
         """
-        Generate a comprehensive grouped bar chart showing all models and all metrics.
+        Generate a grouped bar chart showing all models and all metrics.
         
         Returns:
             Path to the saved chart image
@@ -940,7 +1017,7 @@ class ChartGenerator:
         except Exception as e:
             print(f"Error querying model names: {e}")
         
-        # Define all RAGAS metrics to include - same as radar chart
+        # Define all metrics to include - same as radar chart
         metrics = [
             'factual_correctness',
             'semantic_similarity',
@@ -961,24 +1038,8 @@ class ChartGenerator:
             available_columns = self._fetch_data(schema_query)
             available_metrics = [col[0] for col in available_columns.values]
             
-            # Print available columns for debugging
-            print("Available columns in evaluation_metrics table:")
-            for col in available_metrics:
-                print(f"  - {col}")
-            
-            # Check for string similarity-related columns with flexible matching
-            string_sim_variants = ['string_similarity', 'stringsimilarity', 'str_similarity', 'similarity_string']
-            string_sim_cols = [col for col in available_metrics if any(variant in col.lower() for variant in string_sim_variants)]
-            
-            if string_sim_cols:
-                print(f"Found potential string similarity columns: {string_sim_cols}")
-                # Replace our standard name with the actual column name from database
-                metrics = [string_sim_cols[0] if m == 'string_similarity' else m for m in metrics]
-            
             # Filter metrics to only include those that exist
             valid_metrics = [m for m in metrics if m in available_metrics]
-            
-            print(f"Using these metrics: {valid_metrics}")
             
             if not valid_metrics:
                 logger.error("No valid metrics found in database")
@@ -991,9 +1052,8 @@ class ChartGenerator:
             metrics = valid_metrics
         except Exception as e:
             logger.error(f"Error querying schema: {e}")
-            print(f"Schema query error: {e}")
             # If schema query fails, use default metrics approach
-        metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
+            metrics_str = ', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])
         
         # Define the query
         query = f"""
@@ -1019,31 +1079,13 @@ class ChartGenerator:
             logger.warning("No data found")
             return "No data available"
         
-        # Print the dataframe columns to verify what data we have
-        print("\nColumns in returned data:")
-        print(df.columns.tolist())
-        
-        # Check if any string similarity column is present
-        sim_cols = [col for col in df.columns if 'similarity' in col.lower() and 'semantic' not in col.lower()]
-        if sim_cols:
-            print(f"Found similarity columns in results: {sim_cols}")
-            
-            # If we found a string similarity column but it's not in our metrics list, add it
-            for col in sim_cols:
-                if col not in metrics and 'string' in col.lower():
-                    print(f"Adding missing string similarity column: {col}")
-                    metrics.append(col)
+        # Apply model name shortening
+        df['model_name'] = df['model_name'].apply(self._shorten_model_name)
         
         # Ensure all data is numeric and handle NaN values
         for col in metrics:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-                
-        # Print the Bleu Score values to debug
-        if 'bleu_score' in df.columns:
-            print("\nBleu Score values by model:")
-            for model, score in zip(df['model_name'], df['bleu_score']):
-                print(f"  - {model}: {score}")
                 
         # Ensure very small values are preserved with a minimum display value
         for col in metrics:
@@ -1073,13 +1115,20 @@ class ChartGenerator:
         metric_count = len(metrics)
         
         # Base width plus additional width for more metrics
-        width = max(16, 12 + metric_count * 0.5)
+        width = max(16, 12 + 0.4 * metric_count)
         # Base height plus additional height for more models
-        height = max(10, 6 + model_count * 0.8)
+        height = max(10, 6 + 0.45 * model_count)
         
-        # Create figure with white background
-        fig, ax = plt.subplots(figsize=(width, height), facecolor='white', dpi=150)
+        # Adjust cell size as question count increases
+        cell_size_factor = 1.0 if metric_count <= 8 else (1.0 - min(0.3, (metric_count - 8) * 0.02))
         
+        # Calculate appropriate figure sizes and spacing
+        # Add just enough extra space for legend and note
+        height_with_legend = height + 0.8  # Reduced extra space (was 1.5)
+        
+        # Set up the figure with a high-resolution DPI for better scaling and extra height
+        fig = plt.figure(figsize=(width * cell_size_factor, height_with_legend), facecolor='white', dpi=200)  # Increased DPI for better quality
+
         # Create a vibrant and diverse color palette for better distinction between metrics
         # Define the number of distinct colors needed (one per metric)
         n_colors = len(metrics)
@@ -1120,17 +1169,22 @@ class ChartGenerator:
             alpha=0.9
         )
         
-        # Add labels and title
-        ax.set_title('Comprehensive Model Performance Across All Metrics', 
+        # Add labels and title with optimal spacing for legend
+        ax.set_title('Model Performance Across All Metrics', 
                    fontsize=20, 
                    fontweight='bold',
-                   pad=20)
+                   pad=80)  # Significantly increased padding to create space for legend
         ax.set_xlabel('Model', fontsize=16, fontweight='bold', labelpad=15)
         ax.set_ylabel('Average Score', fontsize=16, fontweight='bold', labelpad=15)
         
         # Dynamic x-label rotation based on number of models
-        rotation = min(45, max(0, model_count * 5))  # 0° for few models, up to 45° for many
-        plt.xticks(rotation=rotation, ha='right' if rotation > 0 else 'center', fontsize=12)
+        # Use horizontal for few models, angled for many
+        if model_count <= 8:
+            plt.xticks(rotation=0, ha='center', fontsize=14, fontweight='bold')  # Larger font
+        else:
+            # Use rotated labels for larger model counts
+            rotation = min(45, max(20, model_count * 1.5))  # Scale rotation with model count
+            plt.xticks(rotation=rotation, ha='right', fontsize=13, fontweight='bold')  # Larger font
         
         # Improve y-axis ticks
         plt.yticks(fontsize=12)
@@ -1148,11 +1202,12 @@ class ChartGenerator:
                       color='#555555',
                       bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="none", alpha=0.8))
         
-        # Add legend with improved formatting
+        # Position legend in the optimal space between title and bars
         legend = plt.legend(
             title='Metrics', 
-            bbox_to_anchor=(1.02, 1),  # Position outside the plot
-            loc='upper left',
+            bbox_to_anchor=(0.5, 1.06),     # Positioned closer to the chart but still above it
+            loc='center',                    # Center the legend
+            ncol=min(4, len(df)),       # Arrange horizontally, max 4 columns
             frameon=True,
             fontsize=11,
             title_fontsize=14,
@@ -1193,21 +1248,21 @@ class ChartGenerator:
             spine.set_linewidth(1.5)
             spine.set_color('#333333')
         
-        # Adjust layout
-        plt.tight_layout(rect=[0, 0.05, 0.85, 0.98])
+        # Adjust layout with optimal spacing for title, legend, and chart
+        plt.tight_layout(rect=[0, 0.05, 1, 0.85])  # More space at top for larger title padding
         
-        # Save the figure with high DPI for quality
-        return self._save_figure("all_models_all_metrics", fig=fig, dpi=300)
-        
-    def ragas_radar_chart(self) -> str:
+        # Save the figure with high DPI for better quality
+        return self._save_figure("all_models_all_metrics", dpi=300, pdf_only=self.pdf_only)
+
+    def enhanced_metrics_radar_chart(self) -> str:
         """
-        Generate an optimized radar chart showing all models and all RAGAS metrics.
-        The chart will display average scores for each model across all RAGAS evaluation metrics.
+        Generate an optimized radar chart showing all models and all metrics.
+        The chart will display average scores for each model across all evaluation metrics.
         
         Returns:
             Path to the saved chart image
         """
-        # Include all RAGAS metrics from the table
+        # Include all metrics from the table
         metrics = [
             'factual_correctness',   # Measures the factual accuracy
             'semantic_similarity',    # Measures semantic similarity to reference
@@ -1289,8 +1344,11 @@ class ChartGenerator:
             metrics = valid_metrics
         
         if df.empty:
-            logger.warning("No data found for RAGAS radar chart")
+            logger.warning("No data found for radar chart")
             return "No data available"
+        
+        # Apply model name shortening
+        df['model_name'] = df['model_name'].apply(self._shorten_model_name)
         
         # Filter out columns that don't exist in the dataframe
         metrics = [m for m in metrics if m in df.columns]
@@ -1312,7 +1370,7 @@ class ChartGenerator:
         # Add a title at the top of the figure
         ax_title = fig.add_subplot(gs[0])
         ax_title.axis('off')  # Hide axis
-        ax_title.text(0.5, 0.5, 'Complete RAGAS Metrics Comparison', 
+        ax_title.text(0.5, 0.5, 'Complete Metrics Comparison', 
                      fontsize=24, fontweight='bold', ha='center', va='center')
         
         # Create radar plot
@@ -1378,11 +1436,6 @@ class ChartGenerator:
             model_name = row['model_name']
             color = model_color_map[model_name]
             
-            # Debug print the values for this model
-            print(f"\nValues for {model_name}:")
-            for m, v in zip(metrics, [row[metric] if metric in row.index and pd.notna(row[metric]) else 0 for metric in metrics]):
-                print(f"  - {m}: {v}")
-                
             # Get values for each metric, handling missing metrics
             original_values = [row[metric] if metric in row.index and pd.notna(row[metric]) else 0 for metric in metrics]
             values = original_values.copy()
@@ -1419,7 +1472,7 @@ class ChartGenerator:
                     
                     # Add text with background for better visibility
                     ax.text(angles[j] + x_offset, value + y_offset, f'{original_value:.2f}', 
-                           fontsize=10, fontweight='bold', ha=ha, va=va,
+                           fontsize=14, fontweight='bold', ha=ha, va=va,
                            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
         
         # Create legend similar to the second image - horizontal colored boxes above the chart
@@ -1443,19 +1496,19 @@ class ChartGenerator:
         plt.tight_layout()
         
         # Save the figure with higher DPI for better quality
-        return self._save_figure("enhanced_ragas_metrics_radar_chart", dpi=300)
+        return self._save_figure("enhanced_metrics_radar_chart", dpi=300, pdf_only=self.pdf_only)
 
     def factual_correctness_matrix(self, max_questions: int = 20, limit_models: int = 8) -> str:
         """
-        Generate a matrix chart showing factual correctness scores for individual questions across different models.
-        This displays the average scores for each question rather than just the latest evaluation.
+        Generate matrix chart(s) showing factual correctness scores for individual questions across different models.
+        Automatically splits into two charts if more than 10 questions: Q1-Q10 and Q11-Q20.
         
         Args:
-            max_questions: Maximum number of questions to include in the matrix (default increased to 20)
+            max_questions: Maximum number of questions to include in the matrix (default 20)
             limit_models: Maximum number of models to include in the matrix
             
         Returns:
-            Path to the saved chart image
+            Path to the saved chart image(s)
         """
         # Query to get ALL results (not just latest) for each model and question
         query = """
@@ -1485,15 +1538,14 @@ class ChartGenerator:
             logger.warning("No data found for factual correctness matrix")
             return "No data available"
         
+        # Apply model name shortening
+        df['model_name'] = df['model_name'].apply(self._shorten_model_name)
+        
         # Ensure all data is numeric
         df['factual_correctness'] = pd.to_numeric(df['factual_correctness'], errors='coerce').fillna(0)
         
         # Calculate average factual correctness for each model/question pair
         avg_df = df.groupby(['model_name', 'query'])['factual_correctness'].mean().reset_index()
-        
-        # Also count evaluations per model for selection and display purposes
-        eval_counts = df.groupby('model_name')['query'].count().reset_index()
-        eval_counts.columns = ['model_name', 'eval_count']
         
         # Load the test cases to get the official test numbers
         try:
@@ -1508,11 +1560,8 @@ class ChartGenerator:
                 if 'query' in test and 'test_no' in test:
                     query_to_test_no[test['query']] = test['test_no']
             
-            # Log the mapping for debugging
-            logger.info(f"Found {len(query_to_test_no)} test cases with query-to-test_no mapping")
-            
             # Add test_no to the dataframe
-            avg_df['test_no'] = avg_df['query'].apply(lambda q: query_to_test_no.get(q, 999))  # Default high number for unknown
+            avg_df['test_no'] = avg_df['query'].apply(lambda q: query_to_test_no.get(q, 999))
         except Exception as e:
             logger.error(f"Error loading test cases: {e}")
             # If we can't load the test cases, create a column with sequential numbers
@@ -1528,26 +1577,69 @@ class ChartGenerator:
         # Filter data for just those models
         avg_df = avg_df[avg_df['model_name'].isin(top_models)]
         
-        # Get questions sorted by test_no instead of frequency
+        # Get questions sorted by test_no
         question_test_no = avg_df[['query', 'test_no']].drop_duplicates()
         question_test_no = question_test_no.sort_values('test_no')
-        common_questions = question_test_no.head(max_questions)['query'].tolist()
+        all_questions = question_test_no.head(max_questions)['query'].tolist()
+        
+        # Determine if we need to split into two charts
+        if len(all_questions) > 10:
+            # Split into two charts: Q1-Q10 and Q11-Q20
+            first_10_questions = all_questions[:10]
+            remaining_questions = all_questions[10:] if len(all_questions) > 10 else []
+            
+            # Generate first chart (Q1-Q10)
+            chart1_path = self._generate_single_matrix_chart(
+                avg_df, first_10_questions, query_to_test_no, top_models, 
+                chart_suffix="_part1", title_suffix=" (Q1-Q10)"
+            )
+            
+            # Generate second chart (Q11-Q20) if there are remaining questions
+            if remaining_questions:
+                chart2_path = self._generate_single_matrix_chart(
+                    avg_df, remaining_questions, query_to_test_no, top_models, 
+                    chart_suffix="_part2", title_suffix=f" (Q11-Q{len(all_questions)})"
+                )
+                return f"Charts saved: {chart1_path} and {chart2_path}"
+            else:
+                return chart1_path
+        else:
+            # Single chart for 10 or fewer questions
+            return self._generate_single_matrix_chart(
+                avg_df, all_questions, query_to_test_no, top_models
+            )
+    
+    def _generate_single_matrix_chart(self, avg_df, questions, query_to_test_no, top_models, 
+                                    chart_suffix="", title_suffix="") -> str:
+        """
+        Helper method to generate a single factual correctness matrix chart.
+        
+        Args:
+            avg_df: DataFrame with averaged factual correctness data
+            questions: List of questions to include in this chart
+            query_to_test_no: Mapping from query text to test number
+            top_models: List of top performing models
+            chart_suffix: Suffix to add to the filename (e.g., "_part1")
+            title_suffix: Suffix to add to the title (e.g., " (Q1-Q10)")
+            
+        Returns:
+            Path to the saved chart image
+        """
+        # Filter data for just those models and questions
+        filtered_df = avg_df[avg_df['query'].isin(questions)]
         
         # Create simplified question labels (Q1, Q2, etc.) that match the test_no
         question_display = {}
-        for q in common_questions:
+        for q in questions:
             test_no = query_to_test_no.get(q, 0)
             if test_no > 0 and test_no < 100:  # Reasonable test_no range
                 question_display[q] = f"Q{test_no}"
             else:
                 # Fallback to order in list if test_no is missing or invalid
-                question_display[q] = f"Q{common_questions.index(q) + 1}"
-        
-        # Filter for just those questions
-        avg_df = avg_df[avg_df['query'].isin(common_questions)]
+                question_display[q] = f"Q{questions.index(q) + 1}"
         
         # Pivot the data to create the matrix using the averaged values
-        matrix_df = avg_df.pivot(index='model_name', columns='query', values='factual_correctness')
+        matrix_df = filtered_df.pivot(index='model_name', columns='query', values='factual_correctness')
         
         # Replace column names with Q1, Q2, etc. labels
         matrix_df = matrix_df.rename(columns=question_display)
@@ -1556,108 +1648,68 @@ class ChartGenerator:
         ordered_columns = sorted(matrix_df.columns, key=lambda x: int(x[1:]) if x[1:].isdigit() else 999)
         matrix_df = matrix_df[ordered_columns]
         
-        # Create figure with size based on number of questions
+        # Create figure with enhanced sizing to prevent overlapping model names
         question_count = len(matrix_df.columns)
         model_count = len(matrix_df.index)
         
-        # Improved sizing formula for better scaling with many questions
-        # Increase width more aggressively as question count grows
-        # More balanced sizing with larger question counts to keep cells square-ish
-        width = max(12, 8 + 0.4 * question_count)  # Base width plus adjustment for questions
-        height = max(8, 6 + 0.45 * model_count)    # Base height plus adjustment for models
+        # Significantly increased height calculations to prevent model name overlapping
+        width = max(18, 12 + 0.7 * question_count)  # Increased base width 
+        height = max(16, 10 + 1.2 * model_count)    # Significantly increased height for model names
         
         # Adjust cell size as question count increases
-        cell_size_factor = 1.0 if question_count <= 8 else (1.0 - min(0.4, (question_count - 8) * 0.025))
+        cell_size_factor = 1.0 if question_count <= 8 else (1.0 - min(0.3, (question_count - 8) * 0.02))
         
-        # Calculate appropriate figure sizes and spacing
-        # Add just enough extra space for legend and note
-        height_with_legend = height + 0.8  # Reduced extra space (was 1.5)
-        
-        # Set up the figure with a high-resolution DPI for better scaling and extra height
-        plt.figure(figsize=(width * cell_size_factor, height_with_legend), facecolor='white', dpi=150)
-        
+        # Set up the figure with larger size and higher DPI for better quality
+        fig = plt.figure(figsize=(width * cell_size_factor, height), facecolor='white', dpi=250)  # Higher DPI
+
         # Create a custom colormap that transitions from white to lighter blues
         # Much lighter colors for better text visibility
-        colors = ["#ffffff", "#f0f8ff", "#e6f2ff", "#ccdfff", "#b3d1ff", "#80b3ff", "#4d94ff", "#1a75ff"]
+        colors = ["#ffffff", "#f0f8ff", "#e1f0ff", "#c8e6ff", "#a8d8f0", "#85c1e9", "#5dade2", "#3498db"]
         custom_cmap = LinearSegmentedColormap.from_list("app_blues", colors)
-        
-        # Create the heatmap with appropriate cell sizes
+
+        # Create the heatmap with enhanced settings for better readability
         ax = sns.heatmap(
             matrix_df,
             annot=True,
-            cmap=custom_cmap,  # Much lighter custom blue colormap
+            cmap=custom_cmap,
             vmin=0,
             vmax=1,
-            linewidths=max(0.5, 1.0 * cell_size_factor),  # Thinner lines for more cells
+            linewidths=max(0.8, 1.2 * cell_size_factor),  # Thicker lines for better separation
             linecolor='white',
             fmt='.2f',
             annot_kws={"color": "black", 
                       "fontweight": "bold",
-                      "fontsize": max(8, 10 * cell_size_factor)},  # Smaller text for more cells
-            cbar=False  # Remove the colorbar completely
+                      "fontsize": max(14, 16 * cell_size_factor)},  # Significantly larger text for better readability
+            cbar=False,  # Remove the colorbar completely
+            square=True   # Force square cells
         )
         
-        # Ensure square cells for better appearance
+        # Enhanced spacing and appearance for better model name visibility
         ax.set_aspect('equal', adjustable='box')
         
-        # Customize the appearance
-        plt.title('Average RAGAS Factual Correctness Score by Model and Question', 
-                 fontsize=16, 
+        # Customize the appearance with enhanced fonts and spacing
+        plt.title(f'Average Factual Correctness Score by Model and Question{title_suffix}', 
+                 fontsize=20,  # Larger title font
                  fontweight='bold',
-                 pad=20)  # Add padding between title and plot
-        plt.xlabel('Questions', fontsize=14)
-        plt.ylabel('Models', fontsize=14)
+                 pad=30)  # More padding
+        plt.xlabel('Questions', fontsize=16, fontweight='bold', labelpad=10)  # Larger font with padding
+        plt.ylabel('Models', fontsize=16, fontweight='bold', labelpad=15)     # Larger font with more padding
+        
+        # Significantly improve y-axis labels (model names) to prevent overlapping
+        plt.yticks(fontsize=14, fontweight='bold', rotation=0)  # Larger, horizontal model names
         
         # Dynamic label rotation based on number of questions
         # Use horizontal for few questions, angled for many
         if question_count <= 8:
-            plt.xticks(rotation=0, ha='center', fontsize=12, fontweight='bold')
+            plt.xticks(rotation=0, ha='center', fontsize=14, fontweight='bold')  # Larger font
         else:
             # Use rotated labels for larger question counts
             rotation = min(45, max(20, question_count * 1.5))  # Scale rotation with question count
-            plt.xticks(rotation=rotation, ha='right', fontsize=11, fontweight='bold')
+            plt.xticks(rotation=rotation, ha='right', fontsize=13, fontweight='bold')  # Larger font
         
-        # Add a legend box under the questions
-        legend_handles = []
-        legend_labels = []
-        
-        # Create custom color squares for the legend with the new color scheme
-        legend_colors = [
-            (custom_cmap(0.1), '0.0 - 0.2'),
-            (custom_cmap(0.3), '0.2 - 0.4'),
-            (custom_cmap(0.5), '0.4 - 0.6'),
-            (custom_cmap(0.7), '0.6 - 0.8'),
-            (custom_cmap(0.9), '0.8 - 1.0')
-        ]
-        
-        for color, label in legend_colors:
-            legend_handles.append(plt.Rectangle((0, 0), 1, 1, color=color))
-            legend_labels.append(label)
-        
-        # Use tight_layout first to organize the main content
+        # Use tight_layout for optimal spacing
         plt.tight_layout()
         
-        # Reduce bottom margin to bring the legend closer to the questions
-        plt.subplots_adjust(bottom=0.15)  # Increased from 0.08 to reduce distance
-        
-        # Create the legend in a fixed position closer to the chart
-        plt.figlegend(
-            legend_handles, 
-            legend_labels,
-            title="Legend",
-            loc='lower center',
-            bbox_to_anchor=(0.5, 0.03),  # Adjusted from 0.06 to move legend up closer to chart
-            ncol=min(len(legend_colors), 5),  # Ensure the legend isn't too wide
-            frameon=True,
-            fontsize=10
-        )
-        
-        # Add explanatory note below the legend but closer to it
-        plt.figtext(
-            0.5, 0.005,  # Position closer to the legend (changed from 0.01)
-            "Note: Values represent the average factual correctness score across multiple evaluations of each question-model pair",
-            ha='center', fontsize=9, fontstyle='italic'
-        )
-        
-        # Save the figure with even higher DPI for better quality with many questions
-        return self._save_figure("factual_correctness_matrix", dpi=300) 
+        # Save the figure with high DPI for better quality
+        filename = f"factual_correctness_matrix{chart_suffix}"
+        return self._save_figure(filename, fig=fig, dpi=300, pdf_only=self.pdf_only) 
