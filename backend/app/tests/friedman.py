@@ -20,11 +20,16 @@ load_dotenv()
 output_dir = "app/tests/test-output"
 os.makedirs(output_dir, exist_ok=True)
 
+# Use localhost for local development instead of postgres container name
+db_host = os.environ.get("DB_HOST", "localhost")
+if db_host == "postgres":
+    db_host = "localhost"
+
 conn = psycopg2.connect(
     dbname=os.environ.get("DB_NAME"),
     user=os.environ.get("DB_USER"),
     password=os.environ.get("DB_PASSWORD"),
-    host=os.environ.get("DB_HOST"),
+    host=db_host,
     port=os.environ.get("DB_PORT")
 )
 
@@ -244,6 +249,8 @@ def plot_and_save_metric_comparison(data_df, metric_name, friedman_results, post
     # 3. Create post-hoc tests graph if applicable
     if friedman_results.get('p_value', 1.0) < 0.05 and (posthoc_results is not None or wilcoxon_results is not None):
         create_posthoc_graph(data_df, metric_name, posthoc_results, wilcoxon_results, model_aliases)
+        # Also create separate table PDF
+        create_posthoc_table(data_df, metric_name, wilcoxon_results, model_aliases)
 
 def create_metric_stats_graph(data_df, metric_name, ordered_models, model_aliases):
     """Create a bar chart showing mean/median/std for each model"""
@@ -327,51 +334,69 @@ def create_boxplot_graph(data_df, metric_name, friedman_results, ordered_models,
 
 def create_posthoc_graph(data_df, metric_name, posthoc_results, wilcoxon_results, model_aliases):
     """Create visualizations for post-hoc tests"""
-    fig, axes = plt.subplots(2, 1, figsize=(12, 10))
     
-    # Add Nemenyi post-hoc test results if available
+    # Create a single heatmap chart for all metrics (no tables)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    
+    # Add metric-specific title with Nemenyi post-hoc test results
     if posthoc_results is not None:
-        axes[0].set_title("Post-hoc Nemenyi Test p-values")
+        metric_title = metric_name.replace('_', ' ').title()
+        ax.set_title(f"{metric_title} - Post-hoc Nemenyi Test p-values", fontsize=14, fontweight='bold')
         posthoc_vals = posthoc_results.values
         models = posthoc_results.columns
         
-        # Create a heatmap-like table
-        im = axes[0].imshow(posthoc_vals, cmap='coolwarm', vmin=0, vmax=0.1)
+        # Create a heatmap with natural blue color transitions
+        # Remove artificial constraints to allow natural gradient flow
+        im = ax.imshow(posthoc_vals, cmap='Blues', vmin=0, vmax=1.0, alpha=0.7)
         
         # Add model aliases as labels
-        axes[0].set_xticks(np.arange(len(models)))
-        axes[0].set_yticks(np.arange(len(models)))
-        axes[0].set_xticklabels([model_aliases[m] for m in models])
-        axes[0].set_yticklabels([model_aliases[m] for m in models])
-        plt.setp(axes[0].get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        ax.set_xticks(np.arange(len(models)))
+        ax.set_yticks(np.arange(len(models)))
+        ax.set_xticklabels([model_aliases[m] for m in models], fontsize=11)
+        ax.set_yticklabels([model_aliases[m] for m in models], fontsize=11)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
         
-        # Add grid lines to create borders around each cell
-        for edge, spine in axes[0].spines.items():
+        # Add thin grid lines to create borders around each cell
+        for edge, spine in ax.spines.items():
             spine.set_visible(True)
             spine.set_color('black')
             spine.set_linewidth(1)
             
-        axes[0].set_xticks(np.arange(-.5, len(models), 1), minor=True)
-        axes[0].set_yticks(np.arange(-.5, len(models), 1), minor=True)
-        axes[0].grid(which='minor', color='black', linestyle='-', linewidth=1)
+        ax.set_xticks(np.arange(-.5, len(models), 1), minor=True)
+        ax.set_yticks(np.arange(-.5, len(models), 1), minor=True)
+        ax.grid(which='minor', color='black', linestyle='-', linewidth=0.5)
         
-        # Add p-values in each cell
+        # Add p-values in each cell - ALL TEXT IS BLACK for better readability
         for i in range(len(models)):
             for j in range(len(models)):
                 if not np.isnan(posthoc_vals[i, j]):
-                    text_color = "black" if posthoc_vals[i, j] > 0.05 else "white"
-                    axes[0].text(j, i, f"{posthoc_vals[i, j]:.4f}", 
-                               ha="center", va="center", color=text_color,
-                               fontsize=8)
+                    # All text is black for consistent readability
+                    ax.text(j, i, f"{posthoc_vals[i, j]:.4f}", 
+                           ha="center", va="center", color="black",
+                           fontsize=12, fontweight='bold')
         
-        # Add a colorbar
-        plt.colorbar(im, ax=axes[0], label="p-value")
-        axes[0].set_aspect('equal')
+        # Add a colorbar with better labeling
+        cbar = plt.colorbar(im, ax=ax, label="p-value")
+        cbar.ax.tick_params(labelsize=10)
+        cbar.set_label("p-value", fontsize=12)
+        ax.set_aspect('equal')
     
-    # Add Wilcoxon test results if available
+    plt.tight_layout()
+    posthoc_path = os.path.join(output_dir, f'{metric_name}_posthoc_tests.pdf')
+    plt.savefig(posthoc_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def create_posthoc_table(data_df, metric_name, wilcoxon_results, model_aliases):
+    """Create table-only visualization for Wilcoxon post-hoc tests"""
+    
     if wilcoxon_results is not None and not wilcoxon_results.empty:
-        axes[1].set_title("Pairwise Wilcoxon Signed-Rank Tests (Bonferroni Correction)")
-        axes[1].axis('off')
+        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+        ax.axis('off')
+        
+        # Add metric-specific title
+        metric_title = metric_name.replace('_', ' ').title()
+        ax.set_title(f"{metric_title} - Pairwise Wilcoxon Signed-Rank Tests (Bonferroni Correction)", 
+                    fontsize=14, fontweight='bold', pad=20)
         
         # Format Wilcoxon results as a table
         if 'error' in wilcoxon_results.columns:
@@ -392,7 +417,7 @@ def create_posthoc_graph(data_df, metric_name, posthoc_results, wilcoxon_results
                 ])
             
             if table_data:
-                table = axes[1].table(
+                table = ax.table(
                     cellText=table_data,
                     colLabels=['Comparison', 'p-value', 'Significant (p<0.05)'],
                     loc='center',
@@ -400,13 +425,18 @@ def create_posthoc_graph(data_df, metric_name, posthoc_results, wilcoxon_results
                     colWidths=[0.6, 0.2, 0.2]  # Control column widths
                 )
                 table.auto_set_font_size(False)
-                table.set_fontsize(9)
-                table.scale(1, 1.5)
-    
-    plt.tight_layout()
-    posthoc_path = os.path.join(output_dir, f'{metric_name}_posthoc_tests.pdf')
-    plt.savefig(posthoc_path)
-    plt.close()
+                table.set_fontsize(11)
+                table.scale(1, 2)
+                
+                # Style the table header
+                for i in range(3):
+                    table[(0, i)].set_facecolor('#E6E6FA')
+                    table[(0, i)].set_text_props(weight='bold')
+        
+        plt.tight_layout()
+        table_path = os.path.join(output_dir, f'{metric_name}_posthoc_table.pdf')
+        plt.savefig(table_path, dpi=300, bbox_inches='tight')
+        plt.close()
 
 def print_metric_stats(data_df, metric_name):
     """Print descriptive statistics for each model for a given metric"""
