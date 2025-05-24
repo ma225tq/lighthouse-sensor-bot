@@ -295,7 +295,7 @@ def create_metric_stats_graph(data_df, metric_name, ordered_models, model_aliase
         height = bar.get_height()
         ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
                 f'Mean: {ordered_means[i]:.3f}\nMedian: {ordered_medians[i]:.3f}\nStd: {ordered_stds[i]:.3f}',
-                ha='center', va='bottom', fontsize=8)
+                ha='center', va='bottom', fontsize=12, fontweight='bold')
     
     plt.tight_layout()
     stats_path = os.path.join(output_dir, f'{metric_name}_statistics.pdf')
