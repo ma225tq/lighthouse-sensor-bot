@@ -19,7 +19,7 @@ Options:
     --max-questions Maximum number of questions for factual-correctness-matrix chart
     --max-models    Maximum number of models for factual-correctness-matrix chart
     --output        Output directory (default: project_root/output/charts)
-    --pdf-only      Generate only PDF files (skip PNG generation)
+    --png           Also generate PNG files in addition to PDF files (by default only PDF files are generated)
 """
 
 import argparse
@@ -109,15 +109,15 @@ def main():
     )
     
     parser.add_argument(
-        "--pdf-only",
+        "--png",
         action="store_true",
-        help="Generate only PDF files (skip PNG generation)"
+        help="Also generate PNG files in addition to PDF files (by default only PDF files are generated)"
     )
     
     args = parser.parse_args()
     
     # Create chart generator
-    chart_generator = ChartGenerator(output_dir=args.output, pdf_only=args.pdf_only)
+    chart_generator = ChartGenerator(output_dir=args.output, pdf_only=not args.png)
     
     # Generate requested charts
     if args.chart_type in ["model-comparison", "all"]:

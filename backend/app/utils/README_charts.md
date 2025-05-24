@@ -35,6 +35,7 @@ Options:
 - `--metric`: Metric to use (default: factual_correctness)
 - `--limit`: Maximum number of queries for query-performance chart (default: 10)
 - `--output`: Output directory (default: project_root/output/charts)
+- `--png`: Generate PNG files in addition to PDF files (by default only PDF files are generated)
 
 Examples:
 
@@ -83,6 +84,9 @@ python backend/app/utils/generate_charts.py --chart-type model-vs-model --model1
 
 # 5. Factual Correctness Matrix (individual question scores across models)
 python backend/app/utils/generate_charts.py --chart-type factual-correctness-matrix
+
+# 6. Generate PNG files in addition to PDF (optional)
+python backend/app/utils/generate_charts.py --chart-type all-models-all-metrics --png
 ```
 
 All generated charts will be saved to the `output/charts` directory in the project root.
@@ -128,8 +132,11 @@ You can also use the `ChartGenerator` class directly in your Python code:
 ```python
 from app.utils.chart_generator import ChartGenerator
 
-# Create a chart generator instance
+# Create a chart generator instance (PDF-only by default)
 chart_generator = ChartGenerator(output_dir="/path/to/output/dir")
+
+# Or create with PNG files as well
+chart_generator = ChartGenerator(output_dir="/path/to/output/dir", pdf_only=False)
 
 # Generate a model comparison chart
 chart_path = chart_generator.model_comparison_chart(
@@ -151,7 +158,7 @@ chart_path = chart_generator.all_models_all_metrics()
 
 ## Output
 
-All charts are saved as PNG files to the specified output directory. The default directory is `output/charts` in the project root.
+All charts are saved as PDF files by default to the specified output directory. The default directory is `output/charts` in the project root. PNG files can be generated in addition by using the `--png` flag or setting `pdf_only=False` in the ChartGenerator constructor.
 
 ## Metrics
 

@@ -56,7 +56,7 @@ class ChartGenerator:
     These charts can be used for thesis or presentation purposes.
     """
     
-    def __init__(self, output_dir: str = None, pdf_only: bool = False):
+    def __init__(self, output_dir: str = None, pdf_only: bool = True):
         """
         Initialize the chart generator.
         
@@ -312,16 +312,19 @@ class ChartGenerator:
             formatted_metric = 'BLEU Score'
         else:
             formatted_metric = ' '.join(word.capitalize() for word in metric_name.split('_'))
-        ax.set_title(f'Average {formatted_metric} by Model', fontsize=20, fontweight='bold')
-        ax.set_xlabel('Model', fontsize=16, fontweight='bold')
-        ax.set_ylabel(f'Average {formatted_metric}', fontsize=16, fontweight='bold')
+        ax.set_title(f'Average {formatted_metric} by Model', fontsize=24, fontweight='bold', pad=30)  # Larger title like heatmap
+        ax.set_xlabel('Model', fontsize=20, fontweight='bold', labelpad=18)  # Larger labels like heatmap
+        ax.set_ylabel(f'Average {formatted_metric}', fontsize=20, fontweight='bold', labelpad=25)  # Larger labels like heatmap
         
         # Add grid lines behind the bars
         ax.grid(axis='y', linestyle='-', alpha=0.2, color='gray', zorder=0)
         
-        # Set x-tick positions and labels with proper rotation
+        # Set x-tick positions and labels with proper rotation and enhanced font
         ax.set_xticks(x)
-        ax.set_xticklabels(models, rotation=45, ha='right', fontsize=13)
+        ax.set_xticklabels(models, rotation=50, ha='right', fontsize=14, fontweight='bold')  # More slanted and slightly smaller for better spacing
+        
+        # Enhance y-axis tick labels
+        ax.tick_params(axis='y', labelsize=16, pad=8)  # Larger y-axis labels (increased from 14)
         
         # Set y-axis limits for better visualization
         max_score = max(scores)
@@ -332,7 +335,7 @@ class ChartGenerator:
             spine.set_linewidth(1.5)  # Thicker border
             spine.set_color('#333333')  # Darker border for better definition
         
-        # Add data labels on top of bars
+        # Add data labels on top of bars with enhanced styling
         for i, bar in enumerate(bars):
             height = bar.get_height()
             # Ensure non-zero values are visible with a minimum height but label shows actual value
@@ -340,20 +343,19 @@ class ChartGenerator:
             if height != display_height:
                 bar.set_height(display_height)
                 
-            ax.annotate(f'{height:.2f}', 
+            ax.annotate(f'{height:.3f}', 
                       xy=(bar.get_x() + bar.get_width() / 2, display_height),
                       xytext=(0, 5),  # 5 points vertical offset for better spacing
                       textcoords="offset points",
                        ha='center', va='bottom',
-                       fontsize=13, fontweight='bold', zorder=10,
-                       bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="none", alpha=0.8))  # Add subtle text background
+                       fontsize=20, fontweight='bold', zorder=10)  # Smaller data labels to prevent overlap (reduced from 28)
         
-        # Add the number of queries per model at the bottom of each bar
+        # Add the number of queries per model at the bottom of each bar with enhanced styling
         for i, count in enumerate(query_counts):
             ax.annotate(f'n={count}',
                       xy=(x[i], 0.01),
                        ha='center', va='bottom',
-                       fontsize=11, color='#555555', zorder=10, fontweight='bold')
+                       fontsize=14, color='#555555', zorder=10, fontweight='bold')  # Larger, bold text
         
         # Add more padding at the bottom for model names
         plt.subplots_adjust(bottom=0.25)
@@ -494,7 +496,7 @@ class ChartGenerator:
                    bbox=dict(facecolor='white', alpha=0.8, edgecolor='red', boxstyle='round,pad=0.5'))
             
             # Add title indicating no data
-            plt.title(f'Metrics Radar Chart for {model_name} (No Data)', fontsize=18, fontweight='bold', y=1.05)
+            plt.title(f'Metrics Radar Chart for {model_name} (No Data)', fontsize=24, fontweight='bold', y=1.05, pad=30)  # Larger title like heatmap
             
             # Log a warning
             logger.warning(f"No data found for model: {model_name}")
@@ -564,12 +566,12 @@ class ChartGenerator:
             original_value = original_values[i]
             if original_value > 0:  # Show ALL non-zero values
                 print(f"Adding label for {metrics[i]}: {original_value}")
-                ax.text(angles[i] + x_offset, value + y_offset, f'{original_value:.2f}', 
+                ax.text(angles[i] + x_offset, value + y_offset, f'{original_value:.3f}', 
                        fontsize=12, fontweight='bold', ha=ha, va=va,
                        bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
         
-        # Add title
-        plt.title(f'Metrics Radar Chart for {model_name} (n={query_count})', fontsize=18, fontweight='bold', y=1.05)
+        # Add title with enhanced styling like heatmap
+        plt.title(f'Metrics Radar Chart for {model_name} (n={query_count})', fontsize=24, fontweight='bold', y=1.05, pad=30)  # Larger title like heatmap
         
         # Adjust layout
         plt.tight_layout()
@@ -692,22 +694,23 @@ class ChartGenerator:
         
         plt.figure(figsize=(width, height), facecolor='white', dpi=250)  # Higher DPI for better quality
         
-        # Create custom light green colormap for good visibility and differentiation from other charts
-        light_colors = ["#ffffff", "#f0fff0", "#e8f5e8", "#d4f1d4", "#b8e6b8", "#90d190", "#6bb66b", "#4caf50"]
-        custom_light_cmap = LinearSegmentedColormap.from_list("light_greens", light_colors)
+        # Create custom colormap with stronger contrast for better visibility of differences  
+        # Use a green gradient for maximum contrast between low and high values
+        strong_colors = ["#ffffff", "#f1f8e9", "#dcedc8", "#c5e1a5", "#aed581", "#9ccc65", "#8bc34a", "#689f38", "#558b2f", "#33691e"]
+        custom_light_cmap = LinearSegmentedColormap.from_list("strong_greens", strong_colors)
         
         # Generate heatmap with enhanced styling and lighter colors for better text visibility
         ax = sns.heatmap(
             df,
             annot=True,
             cmap=custom_light_cmap,  # Custom light green colormap for excellent text visibility
-            fmt=".2f",
+            fmt=".3f",
             linewidths=1.5,  # Thicker lines for better separation
             vmin=0,
             vmax=1,
             square=True,
             cbar_kws={'label': 'Score', 'shrink': 0.8},  # Better colorbar sizing
-            annot_kws={"fontsize": 22, "fontweight": "bold", "color": "black"}  # Large text for maximum visibility
+            annot_kws={"fontsize": 32, "fontweight": "bold", "color": "black"}  # Much larger text for maximum visibility (increased from 26)
         )
         
         # Enhance colorbar text size
@@ -724,10 +727,10 @@ class ChartGenerator:
         plt.ylabel('Models', fontsize=20, fontweight='bold', labelpad=25)   # Larger font with more padding
         
         # Set x-axis labels with better formatting and spacing
-        ax.set_xticklabels(formatted_metrics, rotation=45, ha='right', fontsize=16, fontweight='bold')  # Larger font
+        ax.set_xticklabels(formatted_metrics, rotation=45, ha='right', fontsize=20, fontweight='bold')  # Larger RAGAS metrics labels (increased from 16)
         
         # Set y-axis labels (model names) with enhanced spacing and larger font
-        ax.set_yticklabels(ax.get_yticklabels(), fontsize=17, fontweight='bold', rotation=0)  # Larger font
+        ax.set_yticklabels(ax.get_yticklabels(), fontsize=21, fontweight='bold', rotation=0)  # Larger model names (increased from 17)
         
         # Add extra spacing around the heatmap
         ax.tick_params(axis='y', pad=10)  # Add padding between y-axis labels and heatmap
@@ -784,8 +787,8 @@ class ChartGenerator:
         # Truncate long queries
         df['short_query'] = df['query'].apply(lambda x: (x[:50] + '...') if len(x) > 50 else x)
         
-        # Create figure
-        plt.figure(figsize=(14, 8))
+        # Create figure with enhanced size like heatmap
+        plt.figure(figsize=(16, 10), facecolor='white', dpi=250)  # Larger figure with higher DPI like heatmap
         
         # Create horizontal bar chart
         ax = sns.barplot(
@@ -798,12 +801,16 @@ class ChartGenerator:
         # Format metric name for display
         formatted_metric = ' '.join(word.capitalize() for word in metric_name.split('_'))
         
-        # Add labels and title
-        plt.title(f'{formatted_metric} Scores by Query for {model_name}', fontsize=16)
-        plt.xlabel(f'{formatted_metric} Score', fontsize=14)
-        plt.ylabel('Query', fontsize=14)
+        # Add labels and title with enhanced styling like heatmap
+        plt.title(f'{formatted_metric} Scores by Query for {model_name}', fontsize=24, fontweight='bold', pad=30)  # Larger title like heatmap
+        plt.xlabel(f'{formatted_metric} Score', fontsize=20, fontweight='bold', labelpad=18)  # Larger labels like heatmap
+        plt.ylabel('Query', fontsize=20, fontweight='bold', labelpad=25)  # Larger labels like heatmap
         
-        # Add data labels
+        # Enhance tick labels
+        plt.xticks(fontsize=14, fontweight='bold')  # Larger x-axis tick labels
+        plt.yticks(fontsize=14, fontweight='bold')  # Larger y-axis tick labels
+        
+        # Add data labels with enhanced styling
         for p in ax.patches:
             width = p.get_width()
             # Ensure non-zero values are visible with a minimum width but label shows actual value
@@ -811,11 +818,12 @@ class ChartGenerator:
             if width != display_width:
                 p.set_width(display_width)
                 
-            ax.annotate(f'{width:.2f}', 
+            ax.annotate(f'{width:.3f}', 
                       (display_width, p.get_y() + p.get_height() / 2),
                       ha='left', va='center',
-                      fontsize=10, xytext=(5, 0),
-                      textcoords='offset points')
+                      fontsize=16, fontweight='bold', xytext=(5, 0),  # Larger, bolder text like heatmap
+                      textcoords='offset points',
+                      bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="none", alpha=0.8))  # Add background like heatmap
         
         # Adjust layout
         plt.tight_layout()
@@ -952,7 +960,7 @@ class ChartGenerator:
             offset = width * (i - 0.5)
             bars = ax.bar(x + offset, scores, width, label=model, color=colors[i], zorder=5)
             
-            # Add text annotations for each bar
+            # Add text annotations for each bar with enhanced styling
             for j, bar in enumerate(bars):
                 height = bar.get_height()
                 # Ensure non-zero values are visible with a minimum height but label shows actual value
@@ -960,21 +968,24 @@ class ChartGenerator:
                 if height != display_height:
                     bar.set_height(display_height)
                 
-                ax.annotate(f'{height:.2f}',
+                ax.annotate(f'{height:.3f}',
                           xy=(bar.get_x() + bar.get_width() / 2, display_height),
                           xytext=(0, 3),  # 3 points vertical offset
                           textcoords="offset points",
                           ha='center', va='bottom',
-                          fontsize=10, fontweight='bold', zorder=10)
+                          fontsize=16, fontweight='bold', zorder=10)  # Smaller data labels to prevent overlap (reduced from 28)
         
-        # Configure the rest of the chart
-        ax.set_title(f'Model Comparison: {model1} vs {model2}', fontsize=16, fontweight='bold')
-        ax.set_xlabel('Metric', fontsize=14)
-        ax.set_ylabel('Score', fontsize=14)
+        # Configure the rest of the chart with enhanced styling like heatmap
+        ax.set_title(f'Model Comparison: {model1} vs {model2}', fontsize=24, fontweight='bold', pad=30)  # Larger title like heatmap
+        ax.set_xlabel('Metric', fontsize=20, fontweight='bold', labelpad=18)  # Larger labels like heatmap
+        ax.set_ylabel('Score', fontsize=20, fontweight='bold', labelpad=25)  # Larger labels like heatmap
         
-        # Place metrics at the center of each group
+        # Place metrics at the center of each group with enhanced tick labels
         ax.set_xticks(x)
-        ax.set_xticklabels(metrics_display)
+        ax.set_xticklabels(metrics_display, rotation=30, ha='right', fontsize=16, fontweight='bold')  # More slanted metric names
+        
+        # Enhance y-axis tick labels
+        ax.tick_params(axis='y', labelsize=14, pad=8)  # Larger y-axis labels (fixed: pad instead of labelpad)
         
         # Add grid for better readability
         ax.grid(axis='y', linestyle='--', alpha=0.3, zorder=0)
@@ -982,8 +993,8 @@ class ChartGenerator:
         # Ensure y-axis starts at 0 and ends at 1.0 for better comparison
         ax.set_ylim(0, 1.0)
         
-        # Add legend
-        ax.legend(title='Model Name', loc='upper right')
+        # Add legend with enhanced styling
+        ax.legend(title='Model Name', loc='upper right', fontsize=14, title_fontsize=16)  # Larger legend text
         
         # Adjust layout
         fig.tight_layout()
@@ -1102,33 +1113,55 @@ class ChartGenerator:
             value_name='Score'
         )
         
-        # Format metric names for display
+        # Format metric names for display with longer, more descriptive names
         df_melted['Metric'] = df_melted['Metric'].apply(
-            lambda x: 'ROUGE Score' if x == 'rogue_score' else ('BLEU Score' if x == 'bleu_score' else ' '.join(word.capitalize() for word in x.split('_')))
+            lambda x: 'ROUGE Similarity Score' if x == 'rogue_score' 
+            else ('BLEU Similarity Score' if x == 'bleu_score' 
+            else ('Non-LLM String Similarity' if 'string_similarity' in x.lower()
+            else ('Semantic Similarity Score' if x == 'semantic_similarity'
+            else ('Factual Correctness Score' if x == 'factual_correctness'
+            else ('Faithfulness Score' if x == 'faithfulness'
+            else ' '.join(word.capitalize() for word in x.split('_')))))))
         )
         
         # Close any existing figures
         plt.close('all')
         
-        # Calculate dynamic figure size based on number of models and metrics
+        # Calculate dynamic figure size based on number of models and metrics - expanded for longer metric names
         model_count = len(df['model_name'].unique())
         metric_count = len(metrics)
         
-        # Base width plus additional width for more metrics
-        width = max(16, 12 + 0.4 * metric_count)
+        # Base width plus additional width for more metrics and longer names
+        width = max(20, 16 + 0.6 * metric_count)  # Increased base width for longer metric names
         # Base height plus additional height for more models
-        height = max(10, 6 + 0.45 * model_count)
+        height = max(12, 8 + 0.45 * model_count)
         
         # Adjust cell size as question count increases
         cell_size_factor = 1.0 if metric_count <= 8 else (1.0 - min(0.3, (metric_count - 8) * 0.02))
         
         # Calculate appropriate figure sizes and spacing
-        # Add just enough extra space for legend and note
-        height_with_legend = height + 0.8  # Reduced extra space (was 1.5)
+        # Add extra space for legend and longer metric names
+        height_with_legend = height + 1.2  # More space for larger legend
         
-        # Set up the figure with a high-resolution DPI for better scaling and extra height
-        fig = plt.figure(figsize=(width * cell_size_factor, height_with_legend), facecolor='white', dpi=200)  # Increased DPI for better quality
-
+        # Set up the figure with a high-resolution DPI for better scaling and extra space
+        fig = plt.figure(figsize=(width * cell_size_factor, height_with_legend), facecolor='white', dpi=200)
+        
+        # Create a gridspec for better layout control (like radar chart)
+        gs = fig.add_gridspec(3, 1, height_ratios=[1, 1, 10])  # Title, legend, chart
+        
+        # Add title in separate subplot
+        ax_title = fig.add_subplot(gs[0])
+        ax_title.axis('off')
+        ax_title.text(0.5, 0.5, 'Model Performance Across All Metrics', 
+                     fontsize=24, fontweight='bold', ha='center', va='center')
+        
+        # Add legend in separate subplot
+        ax_legend = fig.add_subplot(gs[1])
+        ax_legend.axis('off')
+        
+        # Create main chart in the bottom subplot
+        ax = fig.add_subplot(gs[2])
+        
         # Create a vibrant and diverse color palette for better distinction between metrics
         # Define the number of distinct colors needed (one per metric)
         n_colors = len(metrics)
@@ -1158,7 +1191,7 @@ class ChartGenerator:
         custom_colors = vibrant_colors[:n_colors]
         
         # Create grouped bar chart with custom colors
-        ax = sns.barplot(
+        sns.barplot(
             data=df_melted,
             x='model_name',
             y='Score',
@@ -1166,30 +1199,22 @@ class ChartGenerator:
             palette=custom_colors,
             saturation=0.95,
             dodge=True,
-            alpha=0.9
+            alpha=0.9,
+            ax=ax  # Use the specific axis
         )
         
-        # Add labels and title with optimal spacing for legend
-        ax.set_title('Model Performance Across All Metrics', 
-                   fontsize=20, 
-                   fontweight='bold',
-                   pad=80)  # Significantly increased padding to create space for legend
-        ax.set_xlabel('Model', fontsize=16, fontweight='bold', labelpad=15)
-        ax.set_ylabel('Average Score', fontsize=16, fontweight='bold', labelpad=15)
+        # Add enhanced axis labels
+        ax.set_xlabel('Model', fontsize=20, fontweight='bold', labelpad=18)  # Larger labels like heatmap
+        ax.set_ylabel('Average Score', fontsize=26, fontweight='bold', labelpad=25)  # Much larger y-axis label (increased from 20)
         
-        # Dynamic x-label rotation based on number of models
-        # Use horizontal for few models, angled for many
-        if model_count <= 8:
-            plt.xticks(rotation=0, ha='center', fontsize=14, fontweight='bold')  # Larger font
-        else:
-            # Use rotated labels for larger model counts
-            rotation = min(45, max(20, model_count * 1.5))  # Scale rotation with model count
-            plt.xticks(rotation=rotation, ha='right', fontsize=13, fontweight='bold')  # Larger font
+        # Dynamic x-label rotation based on number of models with enhanced styling
+        # Use slanted labels for better readability with larger font
+        plt.xticks(rotation=25, ha='right', fontsize=22, fontweight='bold')  # Much larger, slanted model names (increased from 16)
         
-        # Improve y-axis ticks
-        plt.yticks(fontsize=12)
+        # Improve y-axis ticks with enhanced styling
+        plt.yticks(fontsize=18, fontweight='bold')  # Larger y-axis labels (increased from 14)
         
-        # Add the number of queries per model with better formatting
+        # Add the number of queries per model with better formatting and enhanced styling
         model_positions = {model: i for i, model in enumerate(df['model_name'].unique())}
         for model, count in zip(df['model_name'].unique(), df['query_count'].unique()):
             # Add counts at the bottom of the chart with improved visual appeal
@@ -1198,22 +1223,32 @@ class ChartGenerator:
                       xytext=(0, -10),  # Offset below x-axis
                       textcoords='offset points',
                       ha='center', va='top',
-                      fontsize=10, fontweight='bold',
+                      fontsize=14, fontweight='bold',  # Larger, bolder text like heatmap
                       color='#555555',
                       bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="none", alpha=0.8))
         
-        # Position legend in the optimal space between title and bars
-        legend = plt.legend(
-            title='Metrics', 
-            bbox_to_anchor=(0.5, 1.06),     # Positioned closer to the chart but still above it
+        # Remove legend from main chart and add it to the dedicated legend subplot
+        ax.get_legend().remove()  # Remove the automatic legend
+        
+        # Get legend elements from the chart
+        handles, labels = ax.get_legend_handles_labels()
+        
+        # Create legend in the dedicated legend subplot
+        legend = ax_legend.legend(
+            handles, labels,
+            title='Evaluation Metrics', 
             loc='center',                    # Center the legend
-            ncol=min(4, len(df)),       # Arrange horizontally, max 4 columns
+            ncol=min(3, len(labels)),       # Fewer columns to accommodate longer names
             frameon=True,
-            fontsize=11,
-            title_fontsize=14,
+            fontsize=22,  # Much larger legend text (increased from 18)
+            title_fontsize=24,  # Much larger legend title (increased from 20)
             framealpha=0.95,
             edgecolor='#cccccc'
         )
+        
+        # Make legend text bold manually
+        for text in legend.get_texts():
+            text.set_fontweight('bold')
         
         # Add grid for better readability
         plt.grid(axis='y', linestyle='--', alpha=0.3, zorder=0)
@@ -1223,7 +1258,7 @@ class ChartGenerator:
         max_score = df_melted['Score'].max()
         ax.set_ylim(0, min(1.0, max_score * 1.15))
         
-        # Add value labels on top of each bar with improved formatting
+        # Add value labels on top of each bar with improved formatting and enhanced styling like heatmap
         for p in ax.patches:
             height = p.get_height()
             # Set minimum display height for very small values but keep actual data value
@@ -1233,14 +1268,13 @@ class ChartGenerator:
             # Only label bars with significant height
             if height > 0:  # Label all non-zero values
                 ax.annotate(
-                    f'{height:.2f}', 
+                    f'{height:.3f}', 
                     xy=(p.get_x() + p.get_width() / 2, display_height),
                     xytext=(0, 3),  # 3 points vertical offset
                     textcoords="offset points",
                     ha='center', va='bottom',
-                    fontsize=9, fontweight='bold',
-                    color='#333333',
-                    bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.8)
+                    fontsize=24, fontweight='bold',  # Much larger, bolder text for data values (increased from 16)
+                    color='#333333'
                 )
         
         # Add border around the plot for better definition
@@ -1248,8 +1282,8 @@ class ChartGenerator:
             spine.set_linewidth(1.5)
             spine.set_color('#333333')
         
-        # Adjust layout with optimal spacing for title, legend, and chart
-        plt.tight_layout(rect=[0, 0.05, 1, 0.85])  # More space at top for larger title padding
+        # Use tight_layout for proper spacing with gridspec
+        plt.tight_layout()
         
         # Save the figure with high DPI for better quality
         return self._save_figure("all_models_all_metrics", dpi=300, pdf_only=self.pdf_only)
@@ -1367,11 +1401,11 @@ class ChartGenerator:
         # Create a gridspec for the radar plot and legend
         gs = fig.add_gridspec(2, 1, height_ratios=[1, 5])
         
-        # Add a title at the top of the figure
+        # Add a title at the top of the figure with enhanced styling like heatmap
         ax_title = fig.add_subplot(gs[0])
         ax_title.axis('off')  # Hide axis
         ax_title.text(0.5, 0.5, 'Complete Metrics Comparison', 
-                     fontsize=24, fontweight='bold', ha='center', va='center')
+                     fontsize=28, fontweight='bold', ha='center', va='center')  # Larger title like heatmap
         
         # Create radar plot
         ax = fig.add_subplot(gs[1], polar=True)
@@ -1387,11 +1421,11 @@ class ChartGenerator:
         angles += angles[:1]  # Close the polygon
         
         # Set the labels for each axis with increased font size
-        plt.xticks(angles[:-1], metric_labels, fontsize=16, fontweight='bold')
+        plt.xticks(angles[:-1], metric_labels, fontsize=18, fontweight='bold')  # Larger, bolder axis labels
         
         # Draw y-axis labels (grid lines) with better visibility
         plt.yticks([0.2, 0.4, 0.6, 0.8, 1.0], ['0.2', '0.4', '0.6', '0.8', '1.0'], 
-                   color="black", size=14)
+                   color="black", size=16, fontweight='bold')  # Larger, bolder y-axis labels
         plt.ylim(0, 1)
         
         # Remove the concentric circles for a cleaner look
@@ -1471,8 +1505,8 @@ class ChartGenerator:
                     y_offset = np.sin(angles[j]) * offset
                     
                     # Add text with background for better visibility
-                    ax.text(angles[j] + x_offset, value + y_offset, f'{original_value:.2f}', 
-                           fontsize=14, fontweight='bold', ha=ha, va=va,
+                    ax.text(angles[j] + x_offset, value + y_offset, f'{original_value:.3f}', 
+                           fontsize=12, fontweight='bold', ha=ha, va=va,  # Larger, bolder text like heatmap
                            bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
         
         # Create legend similar to the second image - horizontal colored boxes above the chart
@@ -1489,7 +1523,7 @@ class ChartGenerator:
         
         # Create legend without adding it to the plot yet
         legend = ax_title.legend(handles, legend_labels, loc='upper center', 
-                               ncol=min(4, len(df)), fontsize=12, frameon=True,
+                               ncol=min(4, len(df)), fontsize=14, frameon=True,  # Larger legend font
                                bbox_to_anchor=(0.5, 0.2))
         
         # Adjust layout for better readability
@@ -1662,21 +1696,21 @@ class ChartGenerator:
         # Set up the figure with larger size and higher DPI for better quality
         fig = plt.figure(figsize=(width * cell_size_factor, height), facecolor='white', dpi=250)  # Higher DPI
 
-        # Create a custom colormap that transitions from white to lighter blues
-        # Much lighter colors for better text visibility
-        colors = ["#ffffff", "#f0f8ff", "#e1f0ff", "#c8e6ff", "#a8d8f0", "#85c1e9", "#5dade2", "#3498db"]
-        custom_cmap = LinearSegmentedColormap.from_list("app_blues", colors)
+        # Create custom colormap with stronger contrast for better visibility of differences
+        # Use a blue gradient with darker colors for values over 0.99
+        strong_blue_colors = ["#ffffff", "#f0f7ff", "#e3f2fd", "#c8e6fc", "#bbdefb", "#9fd2f8", "#90caf9", "#64b5f6", "#42a5f5", "#1976d2"]
+        custom_light_cmap = LinearSegmentedColormap.from_list("strong_blues", strong_blue_colors)
 
         # Create the heatmap with enhanced settings for better readability
         ax = sns.heatmap(
             matrix_df,
             annot=True,
-            cmap=custom_cmap,
+            cmap=custom_light_cmap,
             vmin=0,
             vmax=1,
             linewidths=max(0.8, 1.2 * cell_size_factor),  # Thicker lines for better separation
             linecolor='white',
-            fmt='.2f',
+            fmt='.3f',
             annot_kws={"color": "black", 
                       "fontweight": "bold",
                       "fontsize": max(14, 16 * cell_size_factor)},  # Significantly larger text for better readability
@@ -1687,25 +1721,25 @@ class ChartGenerator:
         # Enhanced spacing and appearance for better model name visibility
         ax.set_aspect('equal', adjustable='box')
         
-        # Customize the appearance with enhanced fonts and spacing
+        # Customize the appearance with enhanced fonts and spacing like heatmap
         plt.title(f'Average Factual Correctness Score by Model and Question{title_suffix}', 
-                 fontsize=20,  # Larger title font
+                 fontsize=24,  # Larger title font like heatmap (increased from 20)
                  fontweight='bold',
                  pad=30)  # More padding
-        plt.xlabel('Questions', fontsize=16, fontweight='bold', labelpad=10)  # Larger font with padding
-        plt.ylabel('Models', fontsize=16, fontweight='bold', labelpad=15)     # Larger font with more padding
+        plt.xlabel('Questions', fontsize=20, fontweight='bold', labelpad=18)  # Larger font with padding like heatmap
+        plt.ylabel('Models', fontsize=20, fontweight='bold', labelpad=25)     # Larger font with more padding like heatmap
         
         # Significantly improve y-axis labels (model names) to prevent overlapping
-        plt.yticks(fontsize=14, fontweight='bold', rotation=0)  # Larger, horizontal model names
+        plt.yticks(fontsize=16, fontweight='bold', rotation=0)  # Larger, horizontal model names like heatmap
         
-        # Dynamic label rotation based on number of questions
+        # Dynamic label rotation based on number of questions with enhanced styling
         # Use horizontal for few questions, angled for many
         if question_count <= 8:
-            plt.xticks(rotation=0, ha='center', fontsize=14, fontweight='bold')  # Larger font
+            plt.xticks(rotation=0, ha='center', fontsize=18, fontweight='bold')  # Larger Q1-Q20 labels (increased from 16)
         else:
             # Use rotated labels for larger question counts
             rotation = min(45, max(20, question_count * 1.5))  # Scale rotation with question count
-            plt.xticks(rotation=rotation, ha='right', fontsize=13, fontweight='bold')  # Larger font
+            plt.xticks(rotation=rotation, ha='right', fontsize=18, fontweight='bold')  # Larger Q1-Q20 labels (increased from 13)
         
         # Use tight_layout for optimal spacing
         plt.tight_layout()
