@@ -1670,7 +1670,9 @@ class ChartGenerator:
                 question_display[q] = f"Q{test_no}"
             else:
                 # Fallback to order in list if test_no is missing or invalid
-                question_display[q] = f"Q{questions.index(q) + 1}"
+                # For part 2 charts, we need to add offset based on the chart suffix
+                base_offset = 10 if chart_suffix == "_part2" else 0
+                question_display[q] = f"Q{questions.index(q) + 1 + base_offset}"
         
         # Pivot the data to create the matrix using the averaged values
         matrix_df = filtered_df.pivot(index='model_name', columns='query', values='factual_correctness')
