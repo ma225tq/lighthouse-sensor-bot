@@ -14,6 +14,7 @@ The chart generator supports the following chart types:
 6. **All Models All Metrics** - Comprehensive grouped bar chart showing all models and all metrics
 7. **RAGAS Radar Chart** - Optimized radar chart showing all models across all RAGAS metrics
 8. **Factual Correctness Matrix** - Comparison matrix showing individual question scores for each model
+9. **Best Scores Per Metric** - Bar chart showing the highest score achieved for each RAGAS metric and which model achieved it
 
 ## Usage
 
@@ -28,7 +29,7 @@ python backend/app/utils/generate_charts.py [options]
 
 Options:
 - `--chart-type`: Type of chart to generate (default: all)
-  - Options: model-comparison, model-metrics, metrics-heatmap, query-performance, model-vs-model, all-models-all-metrics, all
+  - Options: model-comparison, model-metrics, metrics-heatmap, query-performance, model-vs-model, all-models-all-metrics, enhanced-metrics-radar-chart, factual-correctness-matrix, best-scores-per-metric, all
 - `--model`: Model name to analyze (required for model-metrics and query-performance)
 - `--model1`: First model for model-vs-model comparison
 - `--model2`: Second model for model-vs-model comparison  
@@ -85,7 +86,10 @@ python backend/app/utils/generate_charts.py --chart-type model-vs-model --model1
 # 5. Factual Correctness Matrix (individual question scores across models)
 python backend/app/utils/generate_charts.py --chart-type factual-correctness-matrix
 
-# 6. Generate PNG files in addition to PDF (optional)
+# 6. Best Scores Per Metric (shows highest score for each metric and which model achieved it)
+python backend/app/utils/generate_charts.py --chart-type best-scores-per-metric
+
+# 7. Generate PNG files in addition to PDF (optional)
 python backend/app/utils/generate_charts.py --chart-type all-models-all-metrics --png
 ```
 

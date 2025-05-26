@@ -1749,3 +1749,176 @@ class ChartGenerator:
         # Save the figure with high DPI for better quality
         filename = f"factual_correctness_matrix{chart_suffix}"
         return self._save_figure(filename, fig=fig, dpi=300, pdf_only=self.pdf_only) 
+
+    def best_scores_per_metric(self) -> str:
+        """
+        Generate a bar chart showing the best score achieved for each RAGAS metric
+        and which model achieved that score.
+        
+        Returns:
+            Path to the saved chart image
+        """
+        # Define all metrics to include
+        metrics = [
+            'factual_correctness',
+            'semantic_similarity', 
+            'faithfulness',
+            'bleu_score',
+            'rogue_score',
+            'non_llm_string_similarity'
+        ]
+        
+        # Try to get available columns from the database
+        try:
+            schema_query = """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'evaluation_metrics'
+            """
+            
+            available_columns = self._fetch_data(schema_query)
+            available_metrics = [col[0] for col in available_columns.values]
+            
+            # Filter metrics to only include those that exist
+            valid_metrics = [m for m in metrics if m in available_metrics]
+            
+            if not valid_metrics:
+                logger.error("No valid metrics found in database")
+                raise ValueError("No valid metrics available")
+                
+            # Update metrics list to what's actually available
+            metrics = valid_metrics
+        except Exception as e:
+            logger.error(f"Error querying schema: {e}")
+            # If schema query fails, use default metrics approach
+            pass
+        
+        # Query to get all model scores for each metric
+        query = f"""
+        SELECT 
+            m.name AS model_name,
+            {', '.join([f'AVG(em.{metric}) AS {metric}' for metric in metrics])}
+        FROM 
+            query_result qr
+            JOIN llm_models m ON qr.llm_model_id = m.id
+            JOIN query_evaluation qe ON qr.id = qe.query_result_id
+            JOIN evaluation_metrics em ON qe.evaluation_metrics_id = em.id
+        GROUP BY 
+            m.name
+        """
+        
+        # Fetch the data
+        df = self._fetch_data(query)
+        
+        if df.empty:
+            logger.warning("No data found for best scores per metric")
+            return "No data available"
+        
+        # Apply model name shortening
+        df['model_name'] = df['model_name'].apply(self._shorten_model_name)
+        
+        # Ensure all data is numeric and handle NaN values
+        for col in metrics:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # Find the best score and corresponding model for each metric
+        best_scores = {}
+        best_models = {}
+        
+        for metric in metrics:
+            if metric in df.columns:
+                max_idx = df[metric].idxmax()
+                best_scores[metric] = df.loc[max_idx, metric]
+                best_models[metric] = df.loc[max_idx, 'model_name']
+        
+        # Format metric names for display
+        metric_display_names = {
+            'factual_correctness': 'Factual Correctness Score',
+            'semantic_similarity': 'Semantic Similarity Score', 
+            'faithfulness': 'Faithfulness Score',
+            'bleu_score': 'BLEU Similarity Score',
+            'rogue_score': 'ROUGE Similarity Score',
+            'non_llm_string_similarity': 'Non-LLM String Similarity'
+        }
+        
+        # Prepare data for plotting
+        plot_data = []
+        for metric in metrics:
+            if metric in best_scores:
+                plot_data.append({
+                    'Metric': metric_display_names.get(metric, metric.replace('_', ' ').title()),
+                    'Best_Score': best_scores[metric],
+                    'Best_Model': best_models[metric]
+                })
+        
+        plot_df = pd.DataFrame(plot_data)
+        
+        if plot_df.empty:
+            logger.warning("No valid data for plotting")
+            return "No data available"
+        
+        # Close any existing figures
+        plt.close('all')
+        
+        # Create figure with appropriate size
+        fig, ax = plt.subplots(figsize=(14, 8), facecolor='white', dpi=300)
+        
+        # Create color mapping for models
+        unique_models = plot_df['Best_Model'].unique()
+        colors = ['#a8d5ba', '#f4d03f']  # Light green and yellow like in the image
+        model_colors = {}
+        for i, model in enumerate(unique_models):
+            model_colors[model] = colors[i % len(colors)]
+        
+        # Create the bar chart
+        bars = ax.bar(
+            plot_df['Metric'], 
+            plot_df['Best_Score'],
+            color=[model_colors[model] for model in plot_df['Best_Model']],
+            alpha=0.8,
+            edgecolor='black',
+            linewidth=1
+        )
+        
+        # Customize the chart
+        ax.set_title('Best Score Per RAGAS Metric with Corresponding Model', 
+                    fontsize=20, fontweight='bold', pad=20)
+        ax.set_xlabel('RAGAS Metrics', fontsize=14, fontweight='bold')
+        ax.set_ylabel('Best Score', fontsize=14, fontweight='bold')
+        ax.set_ylim(0, 1.0)
+        
+        # Add value labels on top of bars
+        for i, (bar, score, model) in enumerate(zip(bars, plot_df['Best_Score'], plot_df['Best_Model'])):
+            height = bar.get_height()
+            ax.annotate(f'{score:.3f}', 
+                       xy=(bar.get_x() + bar.get_width() / 2, height),
+                       xytext=(0, 5),
+                       textcoords="offset points",
+                       ha='center', va='bottom',
+                       fontsize=12, fontweight='bold')
+            
+            # Add model name inside the bar
+            ax.text(bar.get_x() + bar.get_width() / 2, height / 2, model,
+                   ha='center', va='center', fontsize=10, fontweight='bold',
+                   rotation=0, color='black')
+        
+        # Rotate x-axis labels for better readability
+        plt.xticks(rotation=45, ha='right', fontsize=12)
+        plt.yticks(fontsize=12)
+        
+        # Add grid for better readability
+        ax.grid(axis='y', linestyle='--', alpha=0.3)
+        
+        # Create legend
+        legend_elements = [plt.Rectangle((0,0),1,1, facecolor=model_colors[model], 
+                                       edgecolor='black', label=model) 
+                         for model in unique_models]
+        ax.legend(handles=legend_elements, title='Models', 
+                 loc='upper right', fontsize=10, title_fontsize=12)
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        # Save the figure
+        return self._save_figure("best_scores_per_metric", fig=fig, dpi=300, pdf_only=self.pdf_only)

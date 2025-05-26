@@ -55,6 +55,7 @@ def main():
             "all-models-all-metrics",
             "enhanced-metrics-radar-chart",
             "factual-correctness-matrix",
+            "best-scores-per-metric",
             "all"
         ],
         default="all",
@@ -177,6 +178,11 @@ def main():
             max_questions=args.max_questions,
             limit_models=args.max_models
         )
+        print(f"Chart saved: {path}")
+        
+    if args.chart_type in ["best-scores-per-metric", "all"]:
+        print("Generating best scores per metric chart...")
+        path = chart_generator.best_scores_per_metric()
         print(f"Chart saved: {path}")
 
 
