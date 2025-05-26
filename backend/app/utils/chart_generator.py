@@ -1392,23 +1392,42 @@ class ChartGenerator:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # Format metric names for display
-        metric_labels = ['ROUGE Score' if metric == 'rogue_score' else ('BLEU Score' if metric == 'bleu_score' else ' '.join(word.capitalize() for word in metric.split('_'))) for metric in metrics]
+        # Format metric names for display with longer, more descriptive names (like all_models_all_metrics)
+        metric_labels = []
+        for metric in metrics:
+            if metric == 'rogue_score':
+                metric_labels.append('ROUGE Similarity Score')
+            elif metric == 'bleu_score':
+                metric_labels.append('BLEU Similarity Score')
+            elif 'string_similarity' in metric.lower():
+                metric_labels.append('Non-LLM String Similarity')
+            elif metric == 'semantic_similarity':
+                metric_labels.append('Semantic Similarity Score')
+            elif metric == 'factual_correctness':
+                metric_labels.append('Factual Correctness Score')
+            elif metric == 'faithfulness':
+                metric_labels.append('Faithfulness Score')
+            else:
+                metric_labels.append(' '.join(word.capitalize() for word in metric.split('_')))
         
-        # Create figure with white background and more space for the legend
-        fig = plt.figure(figsize=(16, 16), facecolor='white')
+        # Create figure with white background and more space for the legend (exactly like all_models_all_metrics)
+        fig = plt.figure(figsize=(20, 20), facecolor='white', dpi=200)  # Larger figure size and higher DPI
         
-        # Create a gridspec for the radar plot and legend
-        gs = fig.add_gridspec(2, 1, height_ratios=[1, 5])
+        # Create a gridspec for the radar plot and legend (exactly like all_models_all_metrics)
+        gs = fig.add_gridspec(3, 1, height_ratios=[1, 1, 10])  # Title, legend, chart
         
-        # Add a title at the top of the figure with enhanced styling like heatmap
+        # Add title in separate subplot (exactly like all_models_all_metrics)
         ax_title = fig.add_subplot(gs[0])
-        ax_title.axis('off')  # Hide axis
-        ax_title.text(0.5, 0.5, 'Complete Metrics Comparison', 
-                     fontsize=28, fontweight='bold', ha='center', va='center')  # Larger title like heatmap
+        ax_title.axis('off')
+        ax_title.text(0.5, 0.5, 'Model Performance Across All Metrics', 
+                     fontsize=24, fontweight='bold', ha='center', va='center')
         
-        # Create radar plot
-        ax = fig.add_subplot(gs[1], polar=True)
+        # Add legend in separate subplot (exactly like all_models_all_metrics)
+        ax_legend = fig.add_subplot(gs[1])
+        ax_legend.axis('off')
+        
+        # Create main radar chart in the bottom subplot (exactly like all_models_all_metrics)
+        ax = fig.add_subplot(gs[2], polar=True)
         
         # Set background color
         ax.set_facecolor('white')
@@ -1420,12 +1439,12 @@ class ChartGenerator:
         angles = [n / float(N) * 2 * np.pi for n in range(N)]
         angles += angles[:1]  # Close the polygon
         
-        # Set the labels for each axis with increased font size
-        plt.xticks(angles[:-1], metric_labels, fontsize=18, fontweight='bold')  # Larger, bolder axis labels
+        # Set the labels for each axis with much larger font size (like all_models_all_metrics)
+        plt.xticks(angles[:-1], metric_labels, fontsize=22, fontweight='bold')  # Much larger, bolder axis labels
         
         # Draw y-axis labels (grid lines) with better visibility
         plt.yticks([0.2, 0.4, 0.6, 0.8, 1.0], ['0.2', '0.4', '0.6', '0.8', '1.0'], 
-                   color="black", size=16, fontweight='bold')  # Larger, bolder y-axis labels
+                   color="black", size=20, fontweight='bold')  # Much larger, bolder y-axis labels
         plt.ylim(0, 1)
         
         # Remove the concentric circles for a cleaner look
@@ -1445,19 +1464,29 @@ class ChartGenerator:
             # Draw the circle as a line
             ax.plot(circle_angles, [r] * len(circle_angles), color='black', linestyle='-', linewidth=0.6, alpha=0.3)
         
-        # Define a custom, darker color palette - similar to the second image
-        custom_colors = [
-            '#1f77b4',  # Blue (nova-pro-v1)
-            '#ff7f0e',  # Orange (claude-3.7-sonnet) 
-            '#2ca02c',  # Green (gemini-2.5-flash-preview)
-            '#17becf',  # Teal (llama-3.1-8b-instruct)
-            '#9467bd',  # Purple (llama-3.3-70b-instruct)
-            '#8c564b',  # Brown (mistral-8b)
-            '#e377c2',  # Pink (gpt-4o-2024-11-20)
-            '#7f7f7f',  # Gray (qwen-2.5-72b-instruct)
-            '#bcbd22',  # Olive
-            '#17becf',  # Teal
+        # Use the same vibrant color palette as all_models_all_metrics for consistency
+        vibrant_colors = [
+            "#3498db",  # Blue
+            "#e74c3c",  # Red
+            "#2ecc71",  # Green
+            "#9b59b6",  # Purple
+            "#f39c12",  # Orange
+            "#1abc9c",  # Turquoise
+            "#d35400",  # Dark Orange
+            "#34495e",  # Navy Blue
+            "#16a085",  # Teal
+            "#c0392b",  # Dark Red
+            "#8e44ad",  # Violet
+            "#27ae60"   # Emerald
         ]
+        
+        # Extend the palette if we have more models than colors
+        n_models = len(df['model_name'])
+        if n_models > len(vibrant_colors):
+            vibrant_colors = vibrant_colors * (n_models // len(vibrant_colors) + 1)
+        
+        # Use only as many colors as needed
+        custom_colors = vibrant_colors[:n_models]
         
         # Create a color mapping dictionary to ensure consistent colors
         model_color_map = {}
@@ -1506,14 +1535,14 @@ class ChartGenerator:
                     
                     # Add text with background for better visibility
                     ax.text(angles[j] + x_offset, value + y_offset, f'{original_value:.3f}', 
-                           fontsize=12, fontweight='bold', ha=ha, va=va,  # Larger, bolder text like heatmap
-                           bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
+                           fontsize=14, fontweight='bold', ha=ha, va=va,  # Larger, bolder text like all_models_all_metrics
+                           bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', boxstyle='round,pad=0.3'))
         
-        # Create legend similar to the second image - horizontal colored boxes above the chart
+        # Create legend for models with sample counts (exactly like all_models_all_metrics)
         handles = []
         legend_labels = []
         
-        for model_name in df['model_name']:
+        for model_name in df['model_name'].unique():
             count = int(df.loc[df['model_name'] == model_name, 'query_count'].iloc[0])
             color = model_color_map[model_name]
             # Create a rectangle patch for each model
@@ -1521,10 +1550,25 @@ class ChartGenerator:
             handles.append(handle)
             legend_labels.append(f"{model_name} (n={count})")
         
-        # Create legend without adding it to the plot yet
-        legend = ax_title.legend(handles, legend_labels, loc='upper center', 
-                               ncol=min(4, len(df)), fontsize=14, frameon=True,  # Larger legend font
-                               bbox_to_anchor=(0.5, 0.2))
+        # Create legend in the dedicated legend subplot (exactly like all_models_all_metrics)
+        legend = ax_legend.legend(
+            handles, legend_labels,
+            title='Models',                     # Title shows "Models" not "Evaluation Metrics"
+            loc='center',                       # Center the legend
+            ncol=min(3, len(legend_labels)),    # Fewer columns to accommodate longer names
+            frameon=True,
+            fontsize=24,                        # Increased legend text size for better readability
+            title_fontsize=28,                  # Increased legend title size to be more prominent
+            framealpha=0.95,
+            edgecolor='#cccccc'
+        )
+        
+        # Make legend text and title bold manually (exactly like all_models_all_metrics)
+        for text in legend.get_texts():
+            text.set_fontweight('bold')
+        # Make the legend title bold and even more prominent
+        legend.get_title().set_fontweight('bold')
+        legend.get_title().set_fontsize(30)  # Even larger title
         
         # Adjust layout for better readability
         plt.tight_layout()
