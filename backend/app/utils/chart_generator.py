@@ -1925,41 +1925,45 @@ class ChartGenerator:
             linewidth=1
         )
         
-        # Customize the chart
+        # Customize the chart with larger, bold fonts for thesis visibility
         ax.set_title('Best Score Per RAGAS Metric with Corresponding Model', 
-                    fontsize=20, fontweight='bold', pad=20)
-        ax.set_xlabel('RAGAS Metrics', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Best Score', fontsize=14, fontweight='bold')
+                    fontsize=28, fontweight='bold', pad=25)
+        ax.set_xlabel('RAGAS Metrics', fontsize=20, fontweight='bold', labelpad=15)
+        ax.set_ylabel('Best Score', fontsize=20, fontweight='bold', labelpad=15)
         ax.set_ylim(0, 1.0)
         
-        # Add value labels on top of bars
+        # Add value labels on top of bars with larger, bold text
         for i, (bar, score, model) in enumerate(zip(bars, plot_df['Best_Score'], plot_df['Best_Model'])):
             height = bar.get_height()
             ax.annotate(f'{score:.3f}', 
                        xy=(bar.get_x() + bar.get_width() / 2, height),
-                       xytext=(0, 5),
+                       xytext=(0, 8),
                        textcoords="offset points",
                        ha='center', va='bottom',
-                       fontsize=12, fontweight='bold')
+                       fontsize=18, fontweight='bold')
             
-            # Add model name inside the bar
+            # Add model name inside the bar with larger, bold text
             ax.text(bar.get_x() + bar.get_width() / 2, height / 2, model,
-                   ha='center', va='center', fontsize=10, fontweight='bold',
+                   ha='center', va='center', fontsize=14, fontweight='bold',
                    rotation=0, color='black')
         
-        # Rotate x-axis labels for better readability
-        plt.xticks(rotation=45, ha='right', fontsize=12)
-        plt.yticks(fontsize=12)
+        # Rotate x-axis labels for better readability with larger, bold fonts
+        plt.xticks(rotation=45, ha='right', fontsize=16, fontweight='bold')
+        plt.yticks(fontsize=16, fontweight='bold')
         
         # Add grid for better readability
         ax.grid(axis='y', linestyle='--', alpha=0.3)
         
-        # Create legend
+        # Create legend with larger, bold fonts
         legend_elements = [plt.Rectangle((0,0),1,1, facecolor=model_colors[model], 
                                        edgecolor='black', label=model) 
                          for model in unique_models]
-        ax.legend(handles=legend_elements, title='Models', 
-                 loc='upper right', fontsize=10, title_fontsize=12)
+        legend = ax.legend(handles=legend_elements, title='Models', 
+                          loc='upper right', fontsize=14, title_fontsize=16)
+        # Make legend text bold
+        for text in legend.get_texts():
+            text.set_fontweight('bold')
+        legend.get_title().set_fontweight('bold')
         
         # Adjust layout
         plt.tight_layout()
