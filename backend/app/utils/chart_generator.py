@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 def get_custom_cursor():
     """Get a database cursor using custom configuration."""
     conn = None
+    cursor = None
     try:
         db_params = get_connection_params()
         conn = psycopg2.connect(
@@ -1970,3 +1971,176 @@ class ChartGenerator:
         
         # Save the figure
         return self._save_figure("best_scores_per_metric", fig=fig, dpi=300, pdf_only=self.pdf_only)
+
+    def token_usage_by_model_chart(self, model_names: List[str] = None) -> str:
+        """
+        Generate a grouped bar chart showing total token usage statistics (prompt, completion, total) and cost by model.
+        
+        Args:
+            model_names: List of model names to include, if None all models are included
+            
+        Returns:
+            Path to the saved chart image
+        """
+        # Model pricing data (per million tokens)
+        MODEL_PRICING = {
+            'anthropic/claude-3.7-sonnet': {
+                'input_cost_per_million': 3.0,
+                'output_cost_per_million': 15.0
+            },
+            'qwen/qwen2.5-vl-72b-instruct': {
+                'input_cost_per_million': 0.25,
+                'output_cost_per_million': 0.75
+            },
+            'qwen/qwen-2.5-72b-instruct': {  # Also map the non-VL version
+                'input_cost_per_million': 0.25,
+                'output_cost_per_million': 0.75
+            },
+            'meta-llama/llama-3.3-70b-instruct': {
+                'input_cost_per_million': 0.07,
+                'output_cost_per_million': 0.25
+            },
+            'meta-llama/llama-3.1-8b-instruct': {
+                'input_cost_per_million': 0.02,
+                'output_cost_per_million': 0.03
+            },
+            'mistralai/ministral-8b': {
+                'input_cost_per_million': 0.10,
+                'output_cost_per_million': 0.10
+            }
+        }
+        
+        # Define the base query to get total token usage data by model
+        query = """
+        SELECT 
+            m.name AS model_name,
+            SUM(tu.prompt_tokens) AS total_prompt_tokens,
+            SUM(tu.completion_tokens) AS total_completion_tokens,
+            SUM(tu.total_tokens) AS total_total_tokens,
+            COUNT(tu.id) AS token_usage_count
+        FROM 
+            token_usage tu
+            JOIN query_result qr ON tu.query_result_id = qr.id
+            JOIN llm_models m ON qr.llm_model_id = m.id
+        """
+        
+        # Add filter for specific models if provided
+        if model_names and len(model_names) > 0:
+            model_filters = ", ".join([f"'{model}'" for model in model_names])
+            query += f"WHERE m.name IN ({model_filters})"
+        
+        # Group by model and sort by total tokens
+        query += """
+        GROUP BY 
+            m.name
+        ORDER BY 
+            total_total_tokens DESC
+        """
+        
+        # Fetch the data
+        df = self._fetch_data(query)
+        
+        if df.empty:
+            logger.warning("No token usage data found")
+            return "No data available"
+        
+        # Calculate costs for each model
+        def calculate_costs(row):
+            model_name = row['model_name']
+            if model_name in MODEL_PRICING:
+                pricing = MODEL_PRICING[model_name]
+                input_cost = (row['total_prompt_tokens'] / 1_000_000) * pricing['input_cost_per_million']
+                output_cost = (row['total_completion_tokens'] / 1_000_000) * pricing['output_cost_per_million']
+                total_cost = input_cost + output_cost
+                return pd.Series([input_cost, output_cost, total_cost])
+            return pd.Series([0.0, 0.0, 0.0])
+        
+        df[['input_cost', 'output_cost', 'total_cost']] = df.apply(calculate_costs, axis=1)
+        
+        # Apply model name shortening
+        df['model_name'] = df['model_name'].apply(self._shorten_model_name)
+        
+        # Ensure all data is numeric and handle NaN values
+        numeric_cols = ['total_prompt_tokens', 'total_completion_tokens', 'total_total_tokens', 'input_cost', 'output_cost', 'total_cost']
+        for col in numeric_cols:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # Close any existing figures
+        plt.close('all')
+        
+        # Create figure with appropriate size
+        fig, ax = plt.subplots(figsize=(16, 10), facecolor='white', dpi=300)
+        
+        # Set up the bar positions
+        x = np.arange(len(df))
+        width = 0.25
+        
+        # Create the grouped bars
+        bars1 = ax.bar(x - width, df['total_prompt_tokens'], width, 
+                       label='Input Tokens', color='#1f77b4', alpha=0.8)
+        bars2 = ax.bar(x, df['total_completion_tokens'], width,
+                       label='Output Tokens', color='#ff7f0e', alpha=0.8)
+        bars3 = ax.bar(x + width, df['total_total_tokens'], width,
+                       label='Total Tokens', color='#2ca02c', alpha=0.8)
+        
+        # Customize the chart with larger, bold fonts for thesis visibility
+        ax.set_title('Total Token Usage and Cost by Model', 
+                    fontsize=28, fontweight='bold', pad=25)
+        ax.set_xlabel('Models', fontsize=20, fontweight='bold', labelpad=15)
+        ax.set_ylabel('Total Token Count', fontsize=20, fontweight='bold', labelpad=15)
+        
+        # Set x-axis labels
+        ax.set_xticks(x)
+        ax.set_xticklabels(df['model_name'], rotation=45, ha='right', 
+                           fontsize=16, fontweight='bold')
+        
+        # Format y-axis with larger, bold fonts
+        ax.ticklabel_format(style='plain', axis='y')
+        plt.yticks(fontsize=16, fontweight='bold')
+        
+        # Add value labels on top of bars with cost underneath
+        def add_value_and_cost_labels(bars, token_values, cost_values):
+            for bar, token_val, cost_val in zip(bars, token_values, cost_values):
+                height = bar.get_height()
+                # Token count label (higher up)
+                ax.annotate(f'{int(token_val):,}', 
+                           xy=(bar.get_x() + bar.get_width() / 2, height),
+                           xytext=(0, 18),
+                           textcoords="offset points",
+                           ha='center', va='bottom',
+                           fontsize=12, fontweight='bold')
+                # Cost label (lower, under tokens)
+                ax.annotate(f'${cost_val:.2f}', 
+                           xy=(bar.get_x() + bar.get_width() / 2, height),
+                           xytext=(0, 3),
+                           textcoords="offset points",
+                           ha='center', va='bottom',
+                           fontsize=10, fontweight='bold', color='black')
+        
+        add_value_and_cost_labels(bars1, df['total_prompt_tokens'], df['input_cost'])
+        add_value_and_cost_labels(bars2, df['total_completion_tokens'], df['output_cost']) 
+        add_value_and_cost_labels(bars3, df['total_total_tokens'], df['total_cost'])
+        
+        # Add legend with larger, bold fonts
+        legend = ax.legend(fontsize=16, title_fontsize=18, loc='upper right')
+        for text in legend.get_texts():
+            text.set_fontweight('bold')
+        legend.get_title().set_fontweight('bold')
+        
+        # Add grid for better readability
+        ax.grid(axis='y', linestyle='--', alpha=0.3)
+        
+        # Adjust layout to make room for labels
+        plt.subplots_adjust(bottom=0.15)
+        
+        # Generate filename suffix for model filtering
+        suffix = ""
+        if model_names:
+            sanitized_models = [self._sanitize_filename(model) for model in model_names]
+            suffix = f"_{'_'.join(sanitized_models[:3])}"  # Limit to first 3 models
+            if len(model_names) > 3:
+                suffix += f"_and_{len(model_names)-3}_more"
+        
+        # Save the figure
+        filename = f"token_usage_and_cost_by_model{suffix}"
+        return self._save_figure(filename, fig=fig, dpi=300, pdf_only=self.pdf_only)

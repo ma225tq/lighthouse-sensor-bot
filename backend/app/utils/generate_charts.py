@@ -56,6 +56,7 @@ def main():
             "enhanced-metrics-radar-chart",
             "factual-correctness-matrix",
             "best-scores-per-metric",
+            "token-usage",
             "all"
         ],
         default="all",
@@ -183,6 +184,11 @@ def main():
     if args.chart_type in ["best-scores-per-metric", "all"]:
         print("Generating best scores per metric chart...")
         path = chart_generator.best_scores_per_metric()
+        print(f"Chart saved: {path}")
+
+    if args.chart_type in ["token-usage", "all"]:
+        print("Generating token usage by model chart...")
+        path = chart_generator.token_usage_by_model_chart()
         print(f"Chart saved: {path}")
 
 
