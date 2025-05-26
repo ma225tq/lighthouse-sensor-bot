@@ -1926,9 +1926,9 @@ class ChartGenerator:
         )
         
         # Customize the chart with larger, bold fonts for thesis visibility
-        ax.set_title('Best Score Per RAGAS Metric with Corresponding Model', 
+        ax.set_title('Best Score Per Metric with Corresponding Model', 
                     fontsize=28, fontweight='bold', pad=25)
-        ax.set_xlabel('RAGAS Metrics', fontsize=20, fontweight='bold', labelpad=15)
+        ax.set_xlabel('Metrics', fontsize=20, fontweight='bold', labelpad=15)
         ax.set_ylabel('Best Score', fontsize=20, fontweight='bold', labelpad=15)
         ax.set_ylim(0, 1.0)
         
