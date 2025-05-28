@@ -281,25 +281,43 @@ def create_metric_stats_graph(data_df, metric_name, ordered_models, model_aliase
     # Add median markers
     ax.scatter(x, ordered_medians, color='red', marker='D', s=50, label='Median')
     
-    # Customize plot
-    ax.set_xlabel('Model')
-    ax.set_ylabel('Score')
-    ax.set_title(f'{metric_name.replace("_", " ").title()} Statistics by Model')
+    # Calculate the maximum height for proper spacing
+    max_height = max(ordered_means)
+    max_std = max(ordered_stds)
+    top_space = max_height + max_std
+    
+    # Set y-axis limits with extra space at the top for labels
+    ax.set_ylim(0, top_space * 1.4)  # Add 40% extra space at the top
+    
+    # Customize plot with enhanced font sizes
+    ax.set_xlabel('Model', fontsize=18, fontweight='bold')
+    ax.set_ylabel('Score', fontsize=18, fontweight='bold')
+    ax.set_title(f'{metric_name.replace("_", " ").title()} Statistics by Model', fontsize=20, fontweight='bold', pad=20)
     ax.set_xticks(x)
-    ax.set_xticklabels(ordered_aliases, rotation=45, ha='right')
-    ax.legend(loc='upper left')
+    ax.set_xticklabels(ordered_aliases, rotation=45, ha='right', fontsize=16, fontweight='bold')
+    ax.legend(loc='upper left', fontsize=14, prop={'weight': 'bold'})
     ax.grid(axis='y', linestyle='--', alpha=0.7)
     
-    # Add mean values above bars
+    # Enhanced Y-axis tick labels
+    ax.tick_params(axis='y', labelsize=14)
+    for label in ax.get_yticklabels():
+        label.set_fontweight('bold')
+    
+    # Add mean values above bars with enhanced styling and better positioning
     for i, bar in enumerate(bars):
         height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+        # Position text higher above the error bars
+        text_y = height + ordered_stds[i] + (top_space * 0.05)  # Add 5% of top space as buffer
+        ax.text(bar.get_x() + bar.get_width()/2., text_y,
                 f'Mean: {ordered_means[i]:.3f}\nMedian: {ordered_medians[i]:.3f}\nStd: {ordered_stds[i]:.3f}',
-                ha='center', va='bottom', fontsize=12, fontweight='bold')
+                ha='center', va='bottom', fontsize=14, fontweight='bold')
     
+    # Adjust layout to prevent overlap
     plt.tight_layout()
+    plt.subplots_adjust(top=0.85)  # Add extra space at the top
+    
     stats_path = os.path.join(output_dir, f'{metric_name}_statistics.pdf')
-    plt.savefig(stats_path)
+    plt.savefig(stats_path, bbox_inches='tight', pad_inches=0.2)
     plt.close()
 
 def create_boxplot_graph(data_df, metric_name, friedman_results, ordered_models, model_aliases):
@@ -321,11 +339,13 @@ def create_boxplot_graph(data_df, metric_name, friedman_results, ordered_models,
         title = f'Comparison of {metric_name} across models\n'
         title += f'Friedman test error: {friedman_results["error"]}'
     
-    plt.title(title)
-    plt.ylabel(metric_name.replace('_', ' ').title())
-    plt.xlabel('Model')
+    # Enhanced styling for title and labels
+    plt.title(title, fontsize=20, fontweight='bold')
+    plt.ylabel(metric_name.replace('_', ' ').title(), fontsize=18, fontweight='bold')
+    plt.xlabel('Model', fontsize=18, fontweight='bold')
     plt.grid(True, linestyle='--', alpha=0.7)
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=45, fontsize=16, fontweight='bold')
+    plt.yticks(fontsize=14, fontweight='bold')
     plt.tight_layout()
     
     boxplot_path = os.path.join(output_dir, f'{metric_name}_boxplot.pdf')
@@ -341,7 +361,7 @@ def create_posthoc_graph(data_df, metric_name, posthoc_results, wilcoxon_results
     # Add metric-specific title with Nemenyi post-hoc test results
     if posthoc_results is not None:
         metric_title = metric_name.replace('_', ' ').title()
-        ax.set_title(f"{metric_title} - Post-hoc Nemenyi Test p-values", fontsize=14, fontweight='bold')
+        ax.set_title(f"{metric_title} - Post-hoc Nemenyi Test p-values", fontsize=20, fontweight='bold')
         posthoc_vals = posthoc_results.values
         models = posthoc_results.columns
         
@@ -349,11 +369,11 @@ def create_posthoc_graph(data_df, metric_name, posthoc_results, wilcoxon_results
         # Remove artificial constraints to allow natural gradient flow
         im = ax.imshow(posthoc_vals, cmap='Blues', vmin=0, vmax=1.0, alpha=0.7)
         
-        # Add model aliases as labels
+        # Add model aliases as labels with enhanced styling
         ax.set_xticks(np.arange(len(models)))
         ax.set_yticks(np.arange(len(models)))
-        ax.set_xticklabels([model_aliases[m] for m in models], fontsize=11)
-        ax.set_yticklabels([model_aliases[m] for m in models], fontsize=11)
+        ax.set_xticklabels([model_aliases[m] for m in models], fontsize=16, fontweight='bold')
+        ax.set_yticklabels([model_aliases[m] for m in models], fontsize=16, fontweight='bold')
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
         
         # Add thin grid lines to create borders around each cell
@@ -370,15 +390,15 @@ def create_posthoc_graph(data_df, metric_name, posthoc_results, wilcoxon_results
         for i in range(len(models)):
             for j in range(len(models)):
                 if not np.isnan(posthoc_vals[i, j]):
-                    # All text is black for consistent readability
+                    # All text is black for consistent readability with enhanced size
                     ax.text(j, i, f"{posthoc_vals[i, j]:.4f}", 
                            ha="center", va="center", color="black",
-                           fontsize=12, fontweight='bold')
+                           fontsize=14, fontweight='bold')
         
-        # Add a colorbar with better labeling
+        # Add a colorbar with better labeling and enhanced styling
         cbar = plt.colorbar(im, ax=ax, label="p-value")
-        cbar.ax.tick_params(labelsize=10)
-        cbar.set_label("p-value", fontsize=12)
+        cbar.ax.tick_params(labelsize=12)
+        cbar.set_label("p-value", fontsize=16, fontweight='bold')
         ax.set_aspect('equal')
     
     plt.tight_layout()
@@ -393,10 +413,10 @@ def create_posthoc_table(data_df, metric_name, wilcoxon_results, model_aliases):
         fig, ax = plt.subplots(1, 1, figsize=(12, 8))
         ax.axis('off')
         
-        # Add metric-specific title
+        # Add metric-specific title with enhanced styling
         metric_title = metric_name.replace('_', ' ').title()
         ax.set_title(f"{metric_title} - Pairwise Wilcoxon Signed-Rank Tests (Bonferroni Correction)", 
-                    fontsize=14, fontweight='bold', pad=20)
+                    fontsize=20, fontweight='bold', pad=20)
         
         # Format Wilcoxon results as a table
         if 'error' in wilcoxon_results.columns:
@@ -425,13 +445,18 @@ def create_posthoc_table(data_df, metric_name, wilcoxon_results, model_aliases):
                     colWidths=[0.6, 0.2, 0.2]  # Control column widths
                 )
                 table.auto_set_font_size(False)
-                table.set_fontsize(11)
+                table.set_fontsize(14)  # Increased from 11
                 table.scale(1, 2)
                 
-                # Style the table header
+                # Style the table header with enhanced font
                 for i in range(3):
                     table[(0, i)].set_facecolor('#E6E6FA')
-                    table[(0, i)].set_text_props(weight='bold')
+                    table[(0, i)].set_text_props(weight='bold', size=16)
+                
+                # Style all table cells to be bold
+                for (i, j), cell in table.get_celld().items():
+                    if i > 0:  # Skip header row
+                        cell.set_text_props(weight='bold')
         
         plt.tight_layout()
         table_path = os.path.join(output_dir, f'{metric_name}_posthoc_table.pdf')
