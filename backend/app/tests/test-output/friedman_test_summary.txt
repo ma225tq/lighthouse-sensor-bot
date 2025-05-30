@@ -6,3 +6,4 @@ bleu_score: p=0.0000 (SIGNIFICANT), 20 queries
 non_llm_string_similarity: p=0.0000 (SIGNIFICANT), 20 queries
 rouge_score: p=0.0000 (SIGNIFICANT), 20 queries
 string_present: p=0.2938 (not significant), 20 queries
+cost: p=0.0000 (SIGNIFICANT), 20 queries
