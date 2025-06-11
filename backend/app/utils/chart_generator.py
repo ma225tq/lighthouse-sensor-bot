@@ -1989,12 +1989,12 @@ class ChartGenerator:
                 'output_cost_per_million': 15.0
             },
             'qwen/qwen2.5-vl-72b-instruct': {
-                'input_cost_per_million': 0.25,
-                'output_cost_per_million': 0.75
+                'input_cost_per_million': 0.12,
+                'output_cost_per_million': 0.39
             },
             'qwen/qwen-2.5-72b-instruct': {  # Also map the non-VL version
-                'input_cost_per_million': 0.25,
-                'output_cost_per_million': 0.75
+                'input_cost_per_million': 0.12,
+                'output_cost_per_million': 0.39
             },
             'meta-llama/llama-3.3-70b-instruct': {
                 'input_cost_per_million': 0.07,
